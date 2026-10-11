@@ -1,0 +1,17 @@
+{
+  "id": "./",
+  "name": "Энергия мира · Неоновый атлас",
+  "short_name": "Энергия мира",
+  "description": "Мировая энергетика, реальные координаты ЦОД и АЭС, 5G и космос",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#070d19",
+  "theme_color": "#070d19",
+  "icons": [
+    {"src":"./assets/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"./assets/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+    {"src":"./assets/icon-maskable.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+  ]
+}
