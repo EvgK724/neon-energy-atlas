@@ -55,6 +55,17 @@ def nuclear(d):
         if f['id']=='nuclear-fleet-limit':f['value']=f"{d['world']['reactors']} действуют · {d['world']['build']} строятся";f['text']='Единого опубликованного прогноза числа действующих блоков мира на 2030/2040 в подключённых источниках нет. Строительство не учитывает будущие закрытия и переносы ввода. Сценарии МАГАТЭ ниже даны в ГВт.';f['publishedAt']='проверено '+TODAY
 
 def generation(d):
+    report_year=datetime.datetime.now(datetime.timezone.utc).year
+    old_report=int(d['sources']['ember'].get('reportYear',d['world']['year']+1))
+    if report_year>old_report:
+        report=f'https://ember-energy.org/latest-insights/global-electricity-review-{report_year}/'
+        try:
+            page=get(report).decode('utf-8',errors='replace')
+            links=re.findall(r'href=[\"\'](https://ember-energy.org/[^\"\']+\.csv)[\"\']',page,re.I)
+            links=[u for u in links if f'Global-Electricity-Review-{report_year}'.lower() in u.lower() and 'dataset' in u.lower()]
+            if len(set(links))==1:
+                d['sources']['ember'].update(dataUrl=links[0],url=report,reportYear=report_year,name=f'Выработка · Ember Global Electricity Review {report_year}')
+        except Exception:pass # unavailable new edition does not invalidate the previous verified source
     raw=get(d['sources']['ember']['dataUrl'])
     try:text=raw.decode('utf-8-sig')
     except UnicodeDecodeError:text=raw.decode('cp1252')
@@ -78,6 +89,15 @@ def generation(d):
     mark(d,'ember',f'последний доступный год страны; мир — {year}')
 
 def coverage(d):
+    last_complete_year=datetime.datetime.now(datetime.timezone.utc).year-1
+    old_year=int(d['sources']['gsma']['period'])
+    if last_complete_year>old_year:
+        candidate=f'https://www.mobileconnectivityindex.com/convertedData/indicator/{last_complete_year}.json'
+        try:
+            proposed=getjson(candidate)['items']
+            if len(proposed)>150 and sum(r.get('year')==last_complete_year for r in proposed)>100:
+                d['sources']['gsma'].update(dataUrl=candidate,period=last_complete_year,name=f'5G · GSMA MCI, данные {last_complete_year}')
+        except Exception:pass
     rows=getjson(d['sources']['gsma']['dataUrl'])['items'];rows=[r for r in rows if r['zone']['type']=='country'];assert len(rows)>150,'incomplete GSMA table'
     vals={r['zone']['isoCode']:r['networkCoverage'].get('coverage5g') for r in rows};assert sum(v is not None for v in vals.values())>150
     for c in d['countries'].values():c['g5']=None
