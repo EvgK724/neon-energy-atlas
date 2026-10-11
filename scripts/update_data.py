@@ -5,6 +5,7 @@ Forecasts need source-aware review; import the reviewed records with --forecasts
 """
 from pathlib import Path
 import argparse,collections,copy,csv,datetime,gzip,hashlib,io,json,math,re,urllib.request,urllib.error,subprocess
+import extra_sources
 ROOT=Path(__file__).resolve().parent.parent
 DATA=ROOT/'docs/data/countries.json'
 NOW=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
@@ -163,6 +164,35 @@ def diff(old,new):
             if a is None or b is None or a==b:continue
             delta=abs(b-a);significant={'dc':delta>=5 and delta/max(abs(a),1)>=.05,'gen':delta/max(abs(a),1)>=.03,'reactors':delta>=1,'build':delta>=1,'g5':delta>=5}[k]
             if significant:changes.append({'source':{'dc':'OpenStreetMap','gen':'Ember','reactors':'МАГАТЭ PRIS','build':'МАГАТЭ PRIS','g5':'GSMA'}[k],'label':{'dc':'ЦОД в OSM','gen':'выработка, ТВт·ч','reactors':'действующие блоки АЭС','build':'строящиеся блоки АЭС','g5':'охват 5G, %'}[k],'country':iso,'name':c['name'],'metric':k,'old':a,'new':b,'oldPeriod':before.get('year') if k=='gen' else old['sources'][{'dc':'osm','reactors':'pris','build':'pris','g5':'gsma'}[k]].get('period'),'newPeriod':c.get('year') if k=='gen' else new['sources'][{'dc':'osm','reactors':'pris','build':'pris','g5':'gsma'}[k]].get('period')})
+    # New topics use comparable source definitions and never interpret a missing
+    # historical value as zero. Current-year launches are identified as YTD.
+    extra_specs={
+        'oil':('eia','добыча нефти, млн барр./сут',.05,0),
+        'oilReserves':('ogj','доказанные запасы нефти, млрд баррелей',.05,0),
+        'gold':('usgs','добыча золота, т/год',.05,0),
+        'goldReserves':('usgsReserves','запасы золота в недрах, т',.05,0),
+        'launches':('gcatLaunches','пусковые попытки за полный год',.10,3),
+        'launchesYtd':('gcatLaunches','пусковые попытки с начала года',.10,3),
+        'satellites':('gcatSatellites','аппараты на орбите Земли',.05,10),
+    }
+    for iso,c in new['countries'].items():
+        before=old['countries'][iso]
+        for key,(source,label,relative,minimum) in extra_specs.items():
+            a,b=before.get(key),c.get(key)
+            if a is None or b is None or a==b:continue
+            # January's cumulative counter reset is not a collapse in launch activity.
+            if key=='launchesYtd' and old.get('spaceStats',{}).get('ytdYear')!=new.get('spaceStats',{}).get('ytdYear'):continue
+            if abs(b-a)>=minimum and abs(b-a)/max(abs(a),.01)>=relative:
+                def label_period(snapshot,record):
+                    return snapshot.get('spaceStats',{}).get('ytdYear') if key=='launchesYtd' else record.get('metricMeta',{}).get(key,{}).get('period',snapshot['sources'].get(source,{}).get('period'))
+                changes.append({'source':new['sources'][source]['name'],'label':label,'country':iso,'name':c['name'],'metric':key,'old':a,'new':b,'oldPeriod':label_period(old,before),'newPeriod':label_period(new,c)})
+        a,b=before.get('starlink'),c.get('starlink')
+        if a and b and a!=b and (a in ['available','launched'])!=(b in ['available','launched']):
+            changes.append({'source':'Starlink','label':'доступность услуги','country':iso,'name':c['name'],'metric':'starlink','old':'доступен' if a in ['available','launched'] else 'иной статус','new':'доступен' if b in ['available','launched'] else 'иной статус','oldStatus':a,'newStatus':b,'oldPeriod':old['sources']['starlink'].get('retrievedAt'),'newPeriod':new['sources']['starlink'].get('retrievedAt')})
+    for key,source,threshold,minimum in [('starlinkSatellites','gcatSatellites',.05,100),('iphone','iphone',.1,0)]:
+        a,b=old['world'].get(key),new['world'].get(key)
+        if a is not None and b is not None and a!=b and abs(b-a)>=minimum and abs(b-a)/max(abs(a),.01)>=threshold:
+            changes.append({'source':new['sources'][source]['name'],'label':'Starlink на орбите' if key=='starlinkSatellites' else 'опубликованная мировая граница базы iPhone, млн','country':'WORLD','name':'Мир','metric':key,'old':a,'new':b,'oldPeriod':old['sources'][source].get('period'),'newPeriod':new['sources'][source].get('period')})
     prev={f['id']:f for f in old.get('forecasts',[])}
     for f in new.get('forecasts',[]):
         p=prev.get(f['id']);a=p.get('targetValue') if p else None;b=f.get('targetValue')
@@ -181,26 +211,42 @@ def diff(old,new):
 
 def validate(d):
     for iso,c in d['countries'].items():
-        for k in ['gen','dc','reactors','build','g5']:
+        for k in ['gen','dc','reactors','build','g5','oil','oilReserves','gold','goldReserves','launches','launchesYtd','satellites','activeSatellites','iphone']:
             v=c.get(k);assert v is None or isinstance(v,(int,float)) and math.isfinite(v) and v>=0,(iso,k,v)
             if k=='g5' and v is not None:assert v<=100
-            if k in ['dc','reactors','build'] and v is not None:assert int(v)==v
+            if k in ['dc','reactors','build','launches','launchesYtd','satellites','activeSatellites'] and v is not None:assert int(v)==v
     for k in ['reactors','build']:assert d['world'][k]==sum(c[k] for c in d['countries'].values())
     assert d['world']['dc']==sum(c['dc'] or 0 for c in d['countries'].values())+d['world']['dcUnassigned']
+    for key in ['launches','launchesYtd','satellites','activeSatellites']:
+        if key in d['world']:assert d['world'][key]==sum(c.get(key) or 0 for c in d['countries'].values())+d['world'][key+'Unallocated'],key
+    if 'starlink' in d['world']:
+        assert d['world']['starlink']==sum(c.get('starlink') in ['available','launched'] for c in d['countries'].values())+d['world'].get('starlinkUnallocated',0)
+        assert all(c.get('starlink') is None or c['starlink'] in extra_sources.STARLINK_STATUSES for c in d['countries'].values())
+    if d['world'].get('iphone') is not None:assert d['world']['metricMeta']['iphone'].get('comparator') in ['>','≈'],'iPhone estimate must retain qualifier'
+    if d['world'].get('activeSatellites') is not None:assert d['world']['activeSatellites']<=d['world']['satellites']
+
+
+def display_number(value):
+    if not isinstance(value,(int,float)):return str(value)
+    if 0<value<.05:return '<0,1'
+    return format(value,',.1f').rstrip('0').rstrip('.').replace(',','\u00a0').replace('.',',')
 
 def run():
-    ap=argparse.ArgumentParser();ap.add_argument('--write',action='store_true');ap.add_argument('--forecasts',type=Path);ap.add_argument('--only',choices=['pris','ember','gsma','osm']);args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--write',action='store_true');ap.add_argument('--forecasts',type=Path);ap.add_argument('--only',choices=['pris','ember','gsma','osm','eia','usgs','gcat','starlink']);args=ap.parse_args()
     old=json.loads(DATA.read_text());d=copy.deepcopy(old);errors={};ok=[]
-    for key,fn in [('pris',nuclear),('ember',generation),('gsma',coverage),('osm',datacenters)]:
+    for key,fn in [('pris',nuclear),('ember',generation),('gsma',coverage),('osm',datacenters),('eia',extra_sources.oil),('usgs',extra_sources.gold),('gcat',extra_sources.space),('starlink',extra_sources.starlink)]:
         if args.only and key!=args.only:continue
         candidate=copy.deepcopy(d)
-        try:fn(candidate);validate(candidate);d=candidate;ok.append(key)
+        try:
+            if key in ['eia','usgs','gcat','starlink']:fn(candidate,get,getjson,NOW,CODES)
+            else:fn(candidate)
+            validate(candidate);d=candidate;ok.append(key)
         except Exception as e:errors[key]=str(e)
     if args.forecasts:
         records=json.loads(args.forecasts.read_text());assert isinstance(records,list) and all(f.get('url','').startswith('https://') and f.get('id') for f in records)
         assert len({f['id'] for f in records})==len(records);d['forecasts']=records
     validate(d);changes=diff(old,d);d['meta']['checkedAt']=NOW;d['meta']['lastAttemptErrors']=errors;d['meta']['refreshedSources']=ok
-    if changes:d['changes'].append({'date':NOW,'title':f'Изменения показателей: {len(changes)}','text':'; '.join(f"{x['name']}, {x.get('label','прогноз')}: {x.get('old','')} → {x.get('new',x.get('reason',''))}; {x.get('oldPeriod','')} → {x.get('newPeriod','')}, {x.get('source','первоисточник')}" for x in changes[:12]),'details':changes})
+    if changes:d['changes'].append({'date':NOW,'title':f'Изменения показателей: {len(changes)}','text':'; '.join(f"{x['name']}, {x.get('label','прогноз')}: {display_number(x.get('old',''))} → {display_number(x.get('new',x.get('reason','')))}; {x.get('oldPeriod','')} → {x.get('newPeriod','')}, {x.get('source','первоисточник')}" for x in changes[:12]),'details':changes})
     d['meta']['revision']='d-'+hashlib.sha256(json.dumps({k:v for k,v in d.items() if k!='meta'},sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:12]
     report={'checkedAt':NOW,'sourcesUpdated':ok,'failedSources':errors,'significant':changes,'revision':d['meta']['revision']}
     (ROOT/'refresh-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')

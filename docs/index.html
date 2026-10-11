@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Энергия мира">
-  <meta name="description" content="Неоновый атлас энергетики: показатели стран, рейтинги ЦОД и АЭС, 5G, выработка, прогнозы, Солнце и космические проекты. Устанавливается на iPhone и iPad.">
+  <meta name="description" content="Неоновый атлас энергетики: показатели стран, ЦОД и АЭС, 5G, нефть, золото, космические пуски, спутники, Starlink и iPhone. Устанавливается на iPhone и iPad.">
   <title>Энергия мира · Неоновый атлас</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
@@ -40,14 +40,31 @@
       <div class="workspace">
         <aside id="layer-panel" aria-label="Слои и поиск">
           <div class="panel-head"><div><span class="eyebrow">СОБЕРИТЕ СВОЮ КАРТУ</span><h2>Слои</h2></div><button class="icon-button close-panel" id="close-layers" aria-label="Закрыть слои">×</button></div>
+          <h3 class="layer-group-title">Энергетика и сети</h3>
           <div class="layer-switches" role="group" aria-label="Включить несколько слоёв">
             <button data-layer="gen" aria-pressed="true" style="--accent:var(--cyan)"><span class="layer-symbol">◒</span><span>Выработка<small>ТВт·ч / год</small></span><span class="check">✓</span></button>
             <button data-layer="dc" aria-pressed="true" style="--accent:var(--orange)"><span class="layer-symbol">●</span><span>ЦОД<small>Объектов в каталоге</small></span><span class="check">✓</span></button>
             <button data-layer="g5" aria-pressed="true" style="--accent:var(--purple)"><span class="layer-symbol">◎</span><span>5G<small>% населения</small></span><span class="check">✓</span></button>
             <button data-layer="nuclear" aria-pressed="true" style="--accent:var(--lime)"><span class="layer-symbol">▲</span><span>АЭС<small>Действующих блоков</small></span><span class="check">✓</span></button>
           </div>
+          <h3 class="layer-group-title">Ресурсы</h3>
+          <div class="layer-switches" role="group" aria-label="Ресурсы">
+            <button data-layer="oil" aria-pressed="false" style="--accent:#8dbbfa"><span class="layer-symbol">◆</span><span>Добыча нефти<small>млн барр./сутки</small></span><span class="check">✓</span></button>
+            <button data-layer="gold" aria-pressed="false" style="--accent:#f4cd6a"><span class="layer-symbol">◇</span><span>Добыча золота<small>тонн за год</small></span><span class="check">✓</span></button>
+          </div>
+          <div class="layer-switches" role="group" aria-label="Запасы ресурсов">
+            <button data-layer="oilReserves" aria-pressed="false" style="--accent:#78a4dd"><span class="layer-symbol">▰</span><span>Запасы нефти<small>млрд баррелей</small></span><span class="check">✓</span></button>
+            <button data-layer="goldReserves" aria-pressed="false" style="--accent:#e5b447"><span class="layer-symbol">▱</span><span>Запасы золота<small>тонн в недрах</small></span><span class="check">✓</span></button>
+          </div>
+          <h3 class="layer-group-title">Космос и устройства</h3>
+          <div class="layer-switches" role="group" aria-label="Космос и устройства">
+            <button data-layer="launches" aria-pressed="false" style="--accent:#ff8faa"><span class="layer-symbol">↗</span><span>Пуски<small>попыток за год</small></span><span class="check">✓</span></button>
+            <button data-layer="satellites" aria-pressed="false" style="--accent:#6be5c6"><span class="layer-symbol">✧</span><span>Спутники<small>на орбите Земли</small></span><span class="check">✓</span></button>
+            <button data-layer="starlink" aria-pressed="false" style="--accent:#b8caff"><span class="layer-symbol">⌁</span><span>Starlink<small>статус услуги</small></span><span class="check">✓</span></button>
+            <button data-layer="iphone" aria-pressed="false" style="--accent:#edb1f5"><span class="layer-symbol">▯</span><span>iPhone<small>активная база</small></span><span class="check">✓</span></button>
+          </div>
           <label class="field-label" for="map-metric">Окраска стран</label>
-          <select id="map-metric"><option value="gen">Выработка электроэнергии</option><option value="dc">ЦОД в открытом каталоге</option><option value="reactors">Действующие атомные блоки</option><option value="g5">Охват населения 5G</option></select>
+          <select id="map-metric"><option value="gen">Выработка электроэнергии</option><option value="dc">ЦОД в открытом каталоге</option><option value="reactors">Действующие атомные блоки</option><option value="g5">Охват населения 5G</option><option value="oil">Добыча нефти и конденсата</option><option value="oilReserves">Запасы нефти</option><option value="gold">Добыча золота</option><option value="goldReserves">Запасы золота в недрах</option><option value="launches">Орбитальные пуски</option><option value="satellites">Спутники на орбите</option><option value="starlink">Starlink · доступность</option><option value="iphone">iPhone · активная база</option></select>
           <p class="small muted">Включите несколько слоёв: подпись страны покажет все выбранные показатели. Цвет заливки задаётся отдельно.</p>
           <div class="legend" id="legend"></div>
           <p class="small muted" id="point-coverage"></p>
@@ -60,7 +77,7 @@
             <div class="map-hint" id="map-hint">Два пальца — масштаб · нажмите страну</div>
             <div class="map-status" id="map-status" role="status">Загрузка карты…</div>
           </div>
-          <div class="profile" aria-live="polite"><div class="profile-heading"><h1 id="profile-name">Весь мир</h1><span id="profile-year">Данные разных периодов</span></div><div class="metrics" id="metrics"></div><p class="profile-note" id="profile-note"></p><div class="country-actions"><button id="country-ranking">Место в рейтинге ↗</button><button id="country-forecast">Прогноз и стройки ↗</button></div></div>
+          <div class="profile" aria-live="polite"><div class="profile-heading"><h1 id="profile-name">Весь мир</h1><span id="profile-year">Данные разных периодов</span></div><div class="metrics" id="metrics"></div><p class="profile-note" id="profile-note"></p><article id="metric-context" class="metric-context"></article><div class="country-actions"><button id="country-ranking">Место в рейтинге ↗</button><button id="country-forecast">Прогноз и стройки ↗</button></div></div>
         </div>
       </div>
     </section>
@@ -74,10 +91,10 @@
     </section>
     <section id="view-ranking" class="view reading-view" aria-label="Рейтинги стран" hidden>
       <span class="eyebrow">ОДИН ПОКАЗАТЕЛЬ — ОДИН РЕЙТИНГ</span><h1>Страны в цифрах</h1>
-      <p class="lead">Сравнивайте отдельно выработку, ЦОД, энергоблоки и 5G. Общий индекс — прозрачный расчёт атласа.</p>
-      <div class="rank-controls"><label>Показатель<select id="rank-metric"><option value="gen">Выработка, ТВт·ч</option><option value="dc">ЦОД в открытом каталоге</option><option value="reactors">Действующие блоки АЭС</option><option value="build">Строящиеся блоки АЭС</option><option value="g5">5G, % населения</option><option value="index">Общий индекс, 0–100</option></select></label><label id="rank-year-label">Период выработки<select id="rank-year"><option value="2025">Единый год: 2025</option><option value="latest">Последний доступный</option></select></label><label>Найти страну<input id="rank-search" type="search" placeholder="Россия, Китай…"></label></div>
+      <p class="lead">Сравнивайте энергетику, ресурсы и космос. Для Starlink показаны статусы услуги; для iPhone — границы доступных данных. Общий индекс сохраняет четыре исходных показателя.</p>
+      <div class="rank-controls"><label>Показатель<select id="rank-metric"><option value="gen">Выработка, ТВт·ч</option><option value="dc">ЦОД в открытом каталоге</option><option value="reactors">Действующие блоки АЭС</option><option value="build">Строящиеся блоки АЭС</option><option value="g5">5G, % населения</option><option value="oil">Добыча нефти и конденсата</option><option value="oilReserves">Запасы нефти</option><option value="gold">Добыча золота</option><option value="goldReserves">Запасы золота в недрах</option><option value="launches">Орбитальные пуски</option><option value="satellites">Спутники на орбите</option><option value="starlink">Starlink · доступность</option><option value="iphone">iPhone · активная база</option><option value="index">Общий индекс, 0–100</option></select></label><label id="rank-year-label">Период выработки<select id="rank-year"><option value="2025">Единый год: 2025</option><option value="latest">Последний доступный</option></select></label><label>Найти страну<input id="rank-search" type="search" placeholder="Россия, Китай…"></label></div>
       <p id="rank-note" class="small muted"></p><div id="rank-pins" class="rank-pins"></div>
-      <div class="table-scroll"><table class="rank-table"><thead><tr><th scope="col">Место</th><th scope="col">Страна</th><th scope="col" id="rank-value-title">ТВт·ч</th><th scope="col">Период</th></tr></thead><tbody id="rank-body"></tbody></table></div>
+      <div class="table-scroll"><table class="rank-table"><thead><tr><th scope="col" id="rank-order-title">Место</th><th scope="col">Страна</th><th scope="col" id="rank-value-title">ТВт·ч</th><th scope="col">Период</th></tr></thead><tbody id="rank-body"></tbody></table></div>
       <p class="small muted" id="rank-count"></p>
       <details class="reading-card"><summary>Как устроен общий индекс</summary><p>Четыре составляющие по 25%: выработка за <span data-generation-year>2025</span> год, ЦОД открытого каталога, действующие атомные блоки и охват 5G за <span data-coverage-year>2025</span> год. Первые три переводятся на шкалу 0–100 по формуле 100 × ln(1 + значение) / ln(1 + максимум). Для 5G используется процент охвата.</p><p>Индекс равен среднему четырёх составляющих. Включаются только страны со всеми четырьмя значениями; отсутствие данных не считается нулём. Нули блоков АЭС — подтверждённое отсутствие в полной таблице PRIS. Логарифм смягчает разницу между крупными и малыми странами.</p><p>Это исследовательский индекс атласа, не официальный рейтинг развития. Он зависит от полноты открытого каталога ЦОД и не оценивает качество связи, надёжность энергосистемы или мощности дата-центров.</p></details>
     </section>
@@ -92,15 +109,15 @@
       <span class="eyebrow">ОБНОВЛЯЕМЫЙ АТЛАС</span><h1>Данные и уведомления</h1>
       <div class="reading-card"><h2>Проверка раз в две недели</h2><p id="monitor-status">Настройка мониторинга…</p><p id="data-status" role="status"></p><p class="small muted" id="forecast-watch-status"></p><button id="refresh-data">Проверить новую версию данных</button></div>
       <div class="reading-card"><h2>Push на iPhone и iPad</h2><p id="push-status" role="status">Проверяем доступность…</p><div class="button-row"><button id="enable-push">Включить уведомления</button><button id="test-push" hidden>Тестовое уведомление</button><button id="disable-push" hidden>Отключить</button></div><p class="small muted">На iPhone и iPad откройте атлас с экрана «Домой», затем нажмите «Включить уведомления» и разрешите их в системном окне. Это нужно сделать на каждом устройстве.</p></div>
-      <details class="reading-card"><summary>Что считается значимым изменением</summary><ul><li>ЦОД каталога: изменение на 5% и не менее 5 объектов.</li><li>Выработка: изменение на 3% в сопоставимом годовом ряду или пересмотр опубликованного значения на 3%.</li><li>АЭС: ввод, закрытие или изменение числа строящихся блоков хотя бы на 1.</li><li>5G: изменение охвата на 5 процентных пунктов.</li><li>Прогнозы: пересмотр на 10% при том же горизонте, перенос срока на год или новый официальный сценарий.</li></ul><p>Пополнение каталога не обязательно означает строительство новых ЦОД. В сообщении указываются источник, период и возможное изменение методики.</p></details>
+      <details class="reading-card"><summary>Что считается значимым изменением</summary><ul><li>ЦОД каталога: изменение на 5% и не менее 5 объектов.</li><li>Выработка: изменение на 3% в сопоставимом годовом ряду или пересмотр опубликованного значения на 3%.</li><li>АЭС: ввод, закрытие или изменение числа строящихся блоков хотя бы на 1.</li><li>5G: изменение охвата на 5 процентных пунктов.</li><li>Добыча и запасы нефти и золота: изменение опубликованного значения на 5%.</li><li>Пуски: 10% и не менее 3 попыток; полный год и текущий неполный год отслеживаются раздельно.</li><li>Спутники страны: 5% и не менее 10 аппаратов; группировка Starlink: 5% и не менее 100.</li><li>Starlink: изменение статуса доступности услуги. Мировая оценка iPhone: пересмотр на 10% после сверки новой публикации.</li><li>Прогнозы: пересмотр на 10% при том же горизонте, перенос срока на год или новый официальный сценарий.</li></ul><p>Пополнение каталога не обязательно означает строительство новых ЦОД. В сообщении указываются источник, период и возможное изменение методики.</p></details>
       <h2>Журнал изменений</h2><div id="change-log"></div>
     </section>
     <section id="view-more" class="view reading-view" aria-label="Другие разделы" hidden>
-      <span class="eyebrow">ЭНЕРГИЯ В МАСШТАБЕ</span><h1>Исследовать дальше</h1><div class="more-grid"><button data-view="sun"><span>☼</span><b>Солнце и Земля</b><small>Сравнение мощности и энергии</small></button><button data-view="space"><span>✧</span><b>Космос</b><small>Орбитальные вычисления и энергетика</small></button><button data-view="updates"><span>↻</span><b>Обновления</b><small>Мониторинг и push-уведомления</small></button><button id="more-about"><span>ⓘ</span><b>Источники</b><small>Определения, даты и установка</small></button></div>
+      <span class="eyebrow">ЭНЕРГИЯ В МАСШТАБЕ</span><h1>Исследовать дальше</h1><div class="more-grid"><button data-view="sun"><span>☼</span><b>Солнце и Земля</b><small>Сравнение мощности и энергии</small></button><button data-view="space"><span>✧</span><b>Космос</b><small>Пуски, спутники и орбитальные проекты</small></button><button data-view="updates"><span>↻</span><b>Обновления</b><small>Мониторинг и push-уведомления</small></button><button id="more-about"><span>ⓘ</span><b>Источники</b><small>Определения, даты и установка</small></button></div>
     </section>
     <section id="view-space" class="view reading-view" aria-label="Космические проекты" hidden>
       <span class="eyebrow">ЗА ПРЕДЕЛАМИ ЗЕМНОЙ СЕТИ</span><h1>Вычисления на орбите.<br><em>Энергия за горизонтом.</em></h1><p class="lead">Что уже произошло — и что пока существует как проект. Космические планы не включены в земные энергетические итоги.</p>
-      <div id="space-timeline" class="timeline"></div>
+      <div id="space-current" class="space-current"></div><p id="space-catalog-note" class="small muted"></p><p class="source-line"><a href="https://planet4589.org/space/gcat/" target="_blank" rel="noopener noreferrer">GCAT · Jonathan McDowell ↗</a>. Пуски считаются по стране организации запуска, спутники — по стране владельца в каталоге.</p><div id="space-timeline" class="timeline"></div>
       <div class="reading-card"><h2>Почему космос не даёт бесплатной энергии</h2><p>Солнечный свет нужно собрать, преобразовать и передать. Вычислительные аппараты требуют радиационной защиты и отвода тепла через излучатели; добавляются стоимость запуска и ограничения связи.</p><p>Спутниковая связь NTN расширяет доступность сети. Это отдельная архитектура, а не автоматическое превращение всей планеты в зону наземного 5G.</p><a href="https://www.3gpp.org/news-events/3gpp-news/sa2-artcle" target="_blank" rel="noopener noreferrer">3GPP · NTN, Release 17 ↗</a></div>
     </section>
   </main>

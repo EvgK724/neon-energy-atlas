@@ -46,6 +46,9 @@ jobs:
               f.write('refresh='+str(refresh).lower()+'\n')
               f.write('publish='+str(publish).lower()+'\n')
           PY
+      - name: Install public PDF parser
+        if: steps.cadence.outputs.refresh == 'true'
+        run: python3 -m pip install --quiet pypdf==6.10.0
       - name: Update statistics
         if: steps.cadence.outputs.refresh == 'true'
         id: refresh
