@@ -18,3 +18,21 @@ dialog{color:var(--ink);background:#0b1525;border:1px solid #3f566d;border-radiu
 @media(max-width:390px){.rank-pins{grid-template-columns:1fr}.rank-pins button{display:grid;grid-template-columns:1fr auto;align-items:center}.rank-pins small{grid-column:1/-1}.rank-pins strong{font-size:1.2rem}.rank-controls{grid-template-columns:1fr}.rank-controls>label:first-child{grid-column:auto}.rank-table th:first-child{width:35px}.rank-table th:nth-child(2){width:34%}.rank-table th:nth-child(3){width:27%}.rank-table td,.rank-table th{padding:9px 5px}.rank-number b{white-space:normal}.more-grid{grid-template-columns:1fr}.metric strong{font-size:1.24rem}}
 #forecast-cards h2{font-size:1.2rem;letter-spacing:-.015em;line-height:1.35}
 @media(max-width:390px){#forecast-cards h2{font-size:1.08rem}}
+
+/* Keep source precision readable at narrow widths and enlarged text sizes. */
+.metrics{grid-template-columns:repeat(auto-fit,minmax(min(100%,10.5rem),1fr))}
+@media(max-width:600px){
+ .rank-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .rank-table tbody{display:block}
+ .rank-table tbody tr{display:grid;grid-template-columns:2rem minmax(0,1fr);column-gap:.6rem;padding:.65rem 0;border-bottom:1px solid #263a4c}
+ .rank-table tbody tr>*{width:auto!important;border:0;padding:0;min-width:0}
+ .rank-table tbody td:first-child{grid-column:1;grid-row:1/4;padding-top:.4rem}
+ .rank-table tbody th{grid-column:2;grid-row:1}
+ .rank-table tbody th button{font-size:.9rem;min-height:2rem}
+ .rank-table tbody .rank-number{grid-column:2;grid-row:2;display:flex;gap:.4rem;flex-wrap:wrap;align-items:baseline;padding:.1rem 0}
+ .rank-number b{font-size:1rem;white-space:nowrap}
+ .rank-number::after{content:attr(data-unit);color:var(--muted);font-size:.68rem}
+ .rank-number i{display:none}
+ .rank-table tbody td:last-child{grid-column:2;grid-row:3;font-size:.66rem}
+ .rank-table tbody td:last-child::before{content:'Период: '}
+}
