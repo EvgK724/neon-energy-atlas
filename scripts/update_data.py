@@ -54,38 +54,44 @@ def nuclear(d):
     for f in d['forecasts']:
         if f['id']=='nuclear-fleet-limit':f['value']=f"{d['world']['reactors']} действуют · {d['world']['build']} строятся";f['text']='Единого опубликованного прогноза числа действующих блоков мира на 2030/2040 в подключённых источниках нет. Строительство не учитывает будущие закрытия и переносы ввода. Сценарии МАГАТЭ ниже даны в ГВт.';f['publishedAt']='проверено '+TODAY
 
+EMBER_DATA='https://files.ember-energy.org/public-downloads/generation/outputs/release_generation_yearly_global.csv'
+def parse_generation(raw,countries,issues=None):
+    reader=csv.DictReader(io.StringIO(raw.decode('utf-8-sig')))
+    assert {'Area','ISO 3 code','Year','Electricity source','Generation (TWh)'}.issubset(reader.fieldnames or []),'unexpected Ember CSV schema'
+    keep={}
+    for r in reader:
+        kind=r['Electricity source'];code='WORLD' if r['Area']=='World' else r['ISO 3 code']
+        if kind not in ['Total generation','Nuclear','Solar'] or code!='WORLD' and code not in countries or not r['Generation (TWh)']:continue
+        year=int(r['Year']);value=float(r['Generation (TWh)'])
+        assert 1980<=year<datetime.datetime.now(datetime.timezone.utc).year and math.isfinite(value),'invalid Ember generation'
+        if value<0:
+            assert kind!='Total generation','negative total generation'
+            if issues is not None:issues.append({'country':code,'year':year,'metric':kind,'sourceValue':value,'action':'отрицательная выработка компонента не используется; показано отсутствие данных'})
+            value=None
+        key=(code,year,kind);assert key not in keep,'duplicate Ember country/year/source';keep[key]=value
+    return keep
+
 def generation(d):
-    report_year=datetime.datetime.now(datetime.timezone.utc).year
-    old_report=int(d['sources']['ember'].get('reportYear',d['world']['year']+1))
-    if report_year>old_report:
-        report=f'https://ember-energy.org/latest-insights/global-electricity-review-{report_year}/'
-        try:
-            page=get(report).decode('utf-8',errors='replace')
-            links=re.findall(r'href=[\"\'](https://ember-energy.org/[^\"\']+\.csv)[\"\']',page,re.I)
-            links=[u for u in links if f'Global-Electricity-Review-{report_year}'.lower() in u.lower() and 'dataset' in u.lower()]
-            if len(set(links))==1:
-                d['sources']['ember'].update(dataUrl=links[0],url=report,reportYear=report_year,name=f'Выработка · Ember Global Electricity Review {report_year}')
-        except Exception:pass # unavailable new edition does not invalidate the previous verified source
-    raw=get(d['sources']['ember']['dataUrl'])
-    try:text=raw.decode('utf-8-sig')
-    except UnicodeDecodeError:text=raw.decode('cp1252')
-    records=list(csv.DictReader(io.StringIO(text)));keep={}
-    for r in records:
-        if r['Unit']!='TWh' or r['Category']!='Electricity generation' or r['Variable'] not in ['Total generation','Nuclear','Solar']:continue
-        code='WORLD' if r['Area']=='World' else r['Country code']
-        if code!='WORLD' and code not in d['countries']:continue
-        if not r['Value']:continue
-        keep[(code,int(r['Year']),r['Variable'])]=float(r['Value'])
-    assert sum(1 for c,y,k in keep if y==2025 and k=='Total generation')>80,'incomplete Ember table'
+    # Official continuously updated download, linked by Ember's Yearly Electricity Data page.
+    # The report's immutable April CSV cannot reflect subsequent national revisions.
+    issues=[];keep=parse_generation(get(EMBER_DATA),d['countries'],issues)
+    world_year=max(y for c,y,k in keep if c=='WORLD' and k=='Total generation')
+    assert world_year>=d['world']['year'],'world series older than previous snapshot'
+    assert sum(1 for c,y,k in keep if y==world_year and k=='Total generation')>80,'incomplete Ember table'
+    assert len({c for c,y,k in keep if k=='Total generation'})>200,'missing Ember countries'
     for code in list(d['countries'])+['WORLD']:
         years=[y for c,y,k in keep if c==code and k=='Total generation']
-        if not years:continue
-        y=max(years);c=d['world'] if code=='WORLD' else d['countries'][code]
-        assert y>=c.get('year',0),'generation source older than previous snapshot'
+        c=d['world'] if code=='WORLD' else d['countries'][code]
+        if not years:
+            c.update(year=None,gen=None,nuclear=None,solar=None);continue
+        y=max(years)
         c.update(year=y,gen=keep[(code,y,'Total generation')],nuclear=keep.get((code,y,'Nuclear')),solar=keep.get((code,y,'Solar')))
     assert 20000<d['world']['gen']<100000
     year=d['world']['year'];hours=8784 if year%4==0 and (year%100!=0 or year%400==0) else 8760
     w=d['world'];w['meanTW']=w['gen']/hours;w['sunSeconds']=w['gen']*3.6e15/3.828e26;w['incidentMinutes']=w['gen']*3600/w['sunIncidentTW']/60
+    d['sources']['ember'].update(name='Выработка · Ember Yearly Electricity Data',url='https://ember-energy.org/data/yearly-electricity-data/',dataUrl=EMBER_DATA,definition='Выработка электроэнергии за календарный год, ТВт·ч; до трёх знаков после запятой, как в текущей выгрузке источника.',note=f'Обновляемая таблица Ember, а не зафиксированное издание годового отчёта. Последний доступный год каждой страны показан отдельно. Сопоставимый рейтинг — {year}; отсутствующие территории не заменены старыми данными другого выпуска. Мировой итог — отдельная строка источника.')
+    d['sources']['ember']['qualityIssues']=issues
+    if issues:d['sources']['ember']['note']+=' Отрицательная выработка отдельных компонентов исключена: '+', '.join(f"{x['country']} {x['metric']} {x['year']}" for x in issues)+'. Итоговая выработка этих стран прошла проверку.'
     mark(d,'ember',f'последний доступный год страны; мир — {year}')
 
 def coverage(d):
@@ -161,7 +167,16 @@ def diff(old,new):
     for f in new.get('forecasts',[]):
         p=prev.get(f['id']);a=p.get('targetValue') if p else None;b=f.get('targetValue')
         if p is None:changes.append({'metric':'forecast','id':f['id'],'name':f['title'],'reason':'новый опубликованный прогноз'})
-        elif p.get('targetYear')!=f.get('targetYear') or (isinstance(a,(int,float)) and isinstance(b,(int,float)) and abs(b-a)/max(abs(a),.01)>=.1):changes.append({'metric':'forecast','id':f['id'],'name':f['title'],'old':a,'new':b,'oldPeriod':p.get('targetYear'),'newPeriod':f.get('targetYear')})
+        else:
+            shifted=p.get('targetYear')!=f.get('targetYear') or p.get('qualifier')!=f.get('qualifier')
+            for key in ['targetValue','targetLow']:
+                av,bv=p.get(key),f.get(key)
+                shifted|=isinstance(av,(int,float)) and isinstance(bv,(int,float)) and abs(bv-av)/max(abs(av),.01)>=.1
+            before_series={str(v['year']):v for v in p.get('series',[])};after_series={str(v['year']):v for v in f.get('series',[])}
+            shifted|=before_series.keys()!=after_series.keys()
+            for year in before_series.keys()&after_series.keys():
+                shifted|=any(abs(after_series[year][key]-before_series[year][key])/max(abs(before_series[year][key]),.01)>=.1 for key in ['lo','hi'])
+            if shifted:changes.append({'metric':'forecast','id':f['id'],'name':f['title'],'old':p.get('value',a),'new':f.get('value',b),'oldPeriod':p.get('targetYear'),'newPeriod':f.get('targetYear'),'reason':'пересмотр значения, сценария или горизонта'})
     return changes
 
 def validate(d):

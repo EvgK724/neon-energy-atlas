@@ -4,11 +4,13 @@
 
 | Метрика | Первичный источник | Единица и ограничение |
 |---|---|---|
-| Выработка | [Ember Global Electricity Review 2026](https://ember-energy.org/latest-insights/global-electricity-review-2026/) | ТВт·ч/календарный год. Последний год каждой страны; мировые и страновые ряды разных лет не суммируются |
+| Выработка | [Ember Yearly Electricity Data](https://ember-energy.org/data/yearly-electricity-data/), [текущая CSV-выгрузка](https://files.ember-energy.org/public-downloads/generation/outputs/release_generation_yearly_global.csv) | ТВт·ч/календарный год. Последний год каждой страны; мировые и страновые ряды разных лет не суммируются |
 | ЦОД | [OpenDatacenterMap](https://opendatacentermap.deuxfleurs.page/), [GeoJSON](https://opendatacentermap.deuxfleurs.page/data.geojson) | Уникальный OSM type/id, functional по меткам. Кампус может дать несколько объектов. Каталог неполон |
 | Энергоблоки | [IAEA PRIS](https://pris-stats.iaea.org/), [страны JSON](https://pris-stats.iaea.org/countrystatistics/country-statistics/), [мир JSON](https://pris-stats.iaea.org/worldstatistics/world-statistics/) | In Operation и Under Construction. Временные ремонты не равны окончательному закрытию. Дата изменения каждой записи не опубликована |
 | 5G стран | [GSMA MCI](https://www.mobileconnectivityindex.com/), [2025 JSON](https://www.mobileconnectivityindex.com/convertedData/indicator/2025.json) | % населения с покрытием; отсутствующие значения — null |
 | 5G мира | [ITU Facts and Figures 2025](https://www.itu.int/itu-d/reports/statistics/2025/10/15/ff25-mobile-network-coverage/) | Отдельная мировая оценка 55,1%, не среднее процентов стран |
+
+Актуальная обновляемая выгрузка Ember может пересматривать цифры апрельского Global Electricity Review. Значения сохранены с точностью опубликованной CSV (до 0,001 ТВт·ч). Если в текущей выгрузке для страны есть только более ранний год, показывается он; если страны нет — «Нет данных». Это не означает падение выработки до нуля.
 
 ## Почему изменились старые числа
 

@@ -1,7 +1,7 @@
 /* Canonical calculations shared by the UI and verification. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.AtlasMetrics=api;})(globalThis,()=>{
   'use strict';
-  const specs={gen:{name:'Выработка',unit:'ТВт·ч',color:'#46dded',source:'ember',digits:2},dc:{name:'ЦОД · открытый каталог',unit:'объектов',color:'#ffae68',source:'osm',digits:0},reactors:{name:'Блоки АЭС',unit:'действующих',color:'#b2f681',source:'pris',digits:0},build:{name:'Блоки АЭС',unit:'строятся',color:'#86d9fc',source:'pris',digits:0},g5:{name:'Охват 5G',unit:'% населения',color:'#c38bff',source:'gsma',digits:2},index:{name:'Индекс атласа',unit:'из 100',color:'#f0edc9',digits:2}};
+  const specs={gen:{name:'Выработка',unit:'ТВт·ч',color:'#46dded',source:'ember',digits:3},dc:{name:'ЦОД · открытый каталог',unit:'объектов',color:'#ffae68',source:'osm',digits:0},reactors:{name:'Блоки АЭС',unit:'действующих',color:'#b2f681',source:'pris',digits:0},build:{name:'Блоки АЭС',unit:'строятся',color:'#86d9fc',source:'pris',digits:0},g5:{name:'Охват 5G',unit:'% населения',color:'#c38bff',source:'gsma',digits:2},index:{name:'Индекс атласа',unit:'из 100',color:'#f0edc9',digits:2}};
   const numeric=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0;
   function scores(countries,year=Math.max(...Object.values(countries).map(c=>c.year||0))){
     const all=Object.entries(countries).filter(([,c])=>c.year===Number(year)&&['dc','gen','reactors','g5'].every(k=>numeric(c[k])));
