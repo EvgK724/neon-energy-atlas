@@ -27,7 +27,7 @@
   <a class="skip-link" href="#main">К содержанию</a>
   <header class="app-header">
     <a class="brand" href="./" aria-label="Энергия мира, главная"><img src="./assets/icon.svg" alt="" width="38" height="38"><span>Энергия мира<small>ИНФРАСТРУКТУРА · ЗЕМЛЯ · КОСМОС</small></span></a>
-    <div class="header-actions"><span class="edition">АТЛАС / СТРАНЫ</span><button class="quiet-button" id="about-button" aria-label="Источники и установка">ⓘ<span> Источники</span></button></div>
+    <div class="header-actions"><span class="edition">АТЛАС / СТРАНЫ</span><button class="quiet-button" id="text-size-button" aria-label="Размер текста" aria-haspopup="dialog" aria-controls="text-size-dialog" aria-expanded="false" title="Размер текста">Aa</button><button class="quiet-button" id="about-button" aria-label="Источники и установка">ⓘ<span> Источники</span></button></div>
   </header>
   <main id="main">
     <section id="view-map" class="view" aria-label="Карта мира">
@@ -106,6 +106,14 @@
   </main>
   <nav class="bottom-nav" aria-label="Разделы"><button data-view="map" aria-current="page"><span>◉</span>Карта</button><button data-view="ranking"><span>▤</span>Рейтинг</button><button data-view="future"><span>↗</span>Прогноз</button><button data-view="more"><span>⊕</span>Ещё</button></nav>
   <div class="panel-scrim" id="panel-scrim" hidden></div>
+  <dialog id="text-size-dialog" aria-labelledby="text-size-title"><div class="dialog-header"><h2 id="text-size-title">Размер текста</h2><button class="icon-button" id="close-text-size" aria-label="Закрыть настройку текста">×</button></div><div class="dialog-body">
+    <fieldset class="text-size-options"><legend class="sr-only">Выберите размер текста</legend>
+      <label><input type="radio" name="text-size" value="normal"><span><strong>Обычный</strong><small>100%</small></span></label>
+      <label><input type="radio" name="text-size" value="large"><span><strong>Крупный</strong><small>125%</small></span></label>
+      <label><input type="radio" name="text-size" value="xlarge"><span><strong>Очень крупный</strong><small>150%</small></span></label>
+    </fieldset>
+    <p class="text-size-preview">Пример: 1 194,4 ТВт·ч</p><p>Размер меняется сразу и сохраняется на этом устройстве.</p>
+  </div></dialog>
   <dialog id="about-dialog" aria-labelledby="about-title"><div class="dialog-header"><h2 id="about-title">Об атласе</h2><button class="icon-button" id="close-about" aria-label="Закрыть информацию">×</button></div><div class="dialog-body">
     <p class="eyebrow" id="snapshot-label">ПОСЛЕДНИЕ ДОСТУПНЫЕ ПУБЛИКАЦИИ</p>
     <h3>Установить на iPhone или iPad</h3><p>Откройте сайт в Safari → «Поделиться» → «На экран “Домой”» → «Добавить». Если предлагается, включите «Открывать как веб-приложение».</p>

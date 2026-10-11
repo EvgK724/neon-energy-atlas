@@ -36,3 +36,26 @@ dialog{color:var(--ink);background:#0b1525;border:1px solid #3f566d;border-radiu
  .rank-table tbody td:last-child{grid-column:2;grid-row:3;font-size:.66rem}
  .rank-table tbody td:last-child::before{content:'Период: '}
 }
+
+/* Device-local reading size also scales map labels and chart text. */
+.app-header{height:auto;min-height:76px}
+.brand,.brand>span{min-width:0}.brand img,.header-actions{flex-shrink:0}
+.header-actions{gap:8px}
+#text-size-button{min-width:44px;padding:6px;font-size:1rem;font-weight:650;letter-spacing:-.07em;border:1px solid #35516a;background:#102337;color:var(--cyan)}
+#text-size-dialog{width:min(440px,calc(100vw - 26px))}
+#text-size-dialog .dialog-header{align-items:flex-start;gap:12px}
+#text-size-title{font-size:1.2rem}
+.text-size-options{border:0;padding:0;margin:0;display:grid;gap:10px;min-width:0}
+.text-size-options label{display:flex;align-items:center;gap:12px;min-width:0;padding:12px;border:1px solid #35516a;border-radius:12px;background:#101f31;cursor:pointer}
+.text-size-options label:has(input:checked){border-color:var(--cyan);background:#123440}
+.text-size-options input{width:20px;height:20px;min-height:0;flex:none;margin:0;accent-color:var(--cyan)}
+.text-size-options span{min-width:0}.text-size-options strong{display:block;font-size:1rem;font-weight:580}
+.text-size-options small{display:block;font-size:.72rem;color:var(--muted)}
+.dialog-body .text-size-preview{font-size:1rem;color:var(--cyan);font-variant-numeric:tabular-nums;border-top:1px solid var(--line);padding-top:18px}
+.country-stat{padding:.4375rem .5625rem}
+.country-stat>strong{font-size:.6875rem;margin-bottom:.25rem}
+.country-numbers{gap:.3125rem .5rem}
+.map-number small{font-size:.5rem}.map-number b{font-size:.6875rem}
+.country-stat.single .map-number b{font-size:.8125rem}
+.chart text{font-size:.6875rem}
+@media(max-width:760px){.app-header{min-height:65px}.brand{flex:1}.header-actions{gap:4px}.quiet-button{padding:6px;min-width:44px}.brand img{width:28px;height:28px}}
