@@ -7,32 +7,34 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Энергия мира">
-  <meta name="description" content="Неоновый атлас энергетики: реальные точки ЦОД и АЭС, 5G, выработка стран, Солнце и космические проекты. Устанавливается на iPhone и iPad.">
+  <meta name="description" content="Неоновый атлас энергетики: показатели стран, рейтинги ЦОД и АЭС, 5G, выработка, прогнозы, Солнце и космические проекты. Устанавливается на iPhone и iPad.">
   <title>Энергия мира · Неоновый атлас</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
   <link rel="stylesheet" href="./vendor/leaflet.css">
-  <link rel="stylesheet" href="./vendor/MarkerCluster.css">
+
   <link rel="stylesheet" href="./style.css">
   <script defer src="./vendor/leaflet.js"></script>
-  <script defer src="./vendor/leaflet.markercluster.js"></script>
+
   <script defer src="./vendor/d3.min.js"></script>
   <script defer src="./vendor/topojson-client.min.js"></script>
+  <script defer src="./metrics.js"></script>
   <script defer src="./app.js"></script>
+  <script defer src="./push.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">К содержанию</a>
   <header class="app-header">
     <a class="brand" href="./" aria-label="Энергия мира, главная"><img src="./assets/icon.svg" alt="" width="38" height="38"><span>Энергия мира<small>ИНФРАСТРУКТУРА · ЗЕМЛЯ · КОСМОС</small></span></a>
-    <div class="header-actions"><span class="edition">АТЛАС / 2026</span><button class="quiet-button" id="about-button" aria-label="Источники и установка">ⓘ<span> О проекте</span></button></div>
+    <div class="header-actions"><span class="edition">АТЛАС / СТРАНЫ</span><button class="quiet-button" id="about-button" aria-label="Источники и установка">ⓘ<span> Источники</span></button></div>
   </header>
   <main id="main">
     <section id="view-map" class="view" aria-label="Карта мира">
       <div class="country-bar">
         <label class="country-select"><span class="sr-only">Выбрать страну</span><select id="country-select"><option value="WORLD">Весь мир</option></select></label>
         <div class="quick-countries"><button data-country="RUS">Россия</button><button data-country="CHN">Китай</button><button data-country="USA">США</button></div>
-        <button id="search-button" class="icon-button" aria-label="Найти ЦОД или АЭС">⌕</button>
+        <button data-view="updates" class="icon-button" aria-label="Обновления и уведомления">↻</button>
         <button id="layers-button" class="layers-toggle" aria-expanded="false" aria-controls="layer-panel">Слои <b id="layer-count">4</b></button>
       </div>
       <div class="workspace">
@@ -40,26 +42,25 @@
           <div class="panel-head"><div><span class="eyebrow">СОБЕРИТЕ СВОЮ КАРТУ</span><h2>Слои</h2></div><button class="icon-button close-panel" id="close-layers" aria-label="Закрыть слои">×</button></div>
           <div class="layer-switches" role="group" aria-label="Включить несколько слоёв">
             <button data-layer="gen" aria-pressed="true" style="--accent:var(--cyan)"><span class="layer-symbol">◒</span><span>Выработка<small>ТВт·ч / год</small></span><span class="check">✓</span></button>
-            <button data-layer="dc" aria-pressed="true" style="--accent:var(--orange)"><span class="layer-symbol">●</span><span>ЦОД<small>Точки объектов</small></span><span class="check">✓</span></button>
+            <button data-layer="dc" aria-pressed="true" style="--accent:var(--orange)"><span class="layer-symbol">●</span><span>ЦОД<small>Объектов в каталоге</small></span><span class="check">✓</span></button>
             <button data-layer="g5" aria-pressed="true" style="--accent:var(--purple)"><span class="layer-symbol">◎</span><span>5G<small>% населения</small></span><span class="check">✓</span></button>
-            <button data-layer="nuclear" aria-pressed="true" style="--accent:var(--lime)"><span class="layer-symbol">▲</span><span>АЭС<small>Точки блоков</small></span><span class="check">✓</span></button>
+            <button data-layer="nuclear" aria-pressed="true" style="--accent:var(--lime)"><span class="layer-symbol">▲</span><span>АЭС<small>Действующих блоков</small></span><span class="check">✓</span></button>
           </div>
-          <label class="field-label" for="nuclear-filter">Статус атомных блоков</label><select id="nuclear-filter"><option value="all">Действуют и строятся</option><option value="operating">Эксплуатационный статус</option><option value="construction">В строительстве</option></select>
-          <label class="field-label" for="dc-filter">Статус объектов ЦОД</label><select id="dc-filter"><option value="active">Нанесены и строятся</option><option value="functional">Действующие по OSM</option><option value="construction">В строительстве</option><option value="proposed">Проекты</option><option value="all">Все статусы</option></select>
-          <div class="search-wrap"><label class="field-label" for="site-search">Поиск ЦОД или АЭС</label><input id="site-search" type="search" placeholder="Название, оператор, город…" autocomplete="off" aria-controls="search-results"><div id="search-results" aria-live="polite"></div></div>
+          <label class="field-label" for="map-metric">Окраска стран</label>
+          <select id="map-metric"><option value="gen">Выработка электроэнергии</option><option value="dc">ЦОД в открытом каталоге</option><option value="reactors">Действующие атомные блоки</option><option value="g5">Охват населения 5G</option></select>
+          <p class="small muted">Включите несколько слоёв: подпись страны покажет все выбранные показатели. Цвет заливки задаётся отдельно.</p>
           <div class="legend" id="legend"></div>
-          <label class="option-row"><input type="checkbox" id="streets-toggle" checked><span>Улицы при увеличении<small>Подложка OpenStreetMap · нужен интернет</small></span></label>
-          <p class="small muted" id="point-coverage">Загружаем координаты объектов…</p>
-          <button class="text-button" id="method-button">Данные и ограничения ↗</button>
+          <p class="small muted" id="point-coverage"></p>
+          <button class="text-button" id="method-button">Определения и даты ↗</button>
         </aside>
         <div class="map-column">
           <div class="map-stage" id="map-stage">
             <div id="map" aria-label="Интерактивная карта. Масштабируйте двумя пальцами или кнопками плюс и минус."></div>
             <div class="map-tools"><button id="zoom-in" aria-label="Увеличить карту">+</button><button id="zoom-out" aria-label="Уменьшить карту">−</button><button id="world-button" aria-label="Показать весь мир">◎</button><button id="expand-map" aria-label="Развернуть карту" aria-pressed="false">⛶</button></div>
-            <div class="map-hint" id="map-hint">Два пальца — масштаб · число в круге — группа объектов</div>
+            <div class="map-hint" id="map-hint">Два пальца — масштаб · нажмите страну</div>
             <div class="map-status" id="map-status" role="status">Загрузка карты…</div>
           </div>
-          <div class="profile" aria-live="polite"><div class="profile-heading"><h1 id="profile-name">Весь мир</h1><span id="profile-year">Данные разных периодов</span></div><div class="metrics" id="metrics"></div><p class="profile-note" id="profile-note"></p><div class="point-counts" id="point-counts"></div></div>
+          <div class="profile" aria-live="polite"><div class="profile-heading"><h1 id="profile-name">Весь мир</h1><span id="profile-year">Данные разных периодов</span></div><div class="metrics" id="metrics"></div><p class="profile-note" id="profile-note"></p><div class="country-actions"><button id="country-ranking">Место в рейтинге ↗</button><button id="country-forecast">Прогноз и стройки ↗</button></div></div>
         </div>
       </div>
     </section>
@@ -71,13 +72,31 @@
       <div class="two-cards"><article class="reading-card"><span class="eyebrow">ЭНЕРГЕТИЧЕСКИЙ ЭКВИВАЛЕНТ</span><h2>≈0,30 микросекунды</h2><p>Полное излучение Солнца во все стороны содержит за это время столько же энергии, сколько мировая электрогенерация за год.</p></article><article class="reading-card"><span class="eyebrow">ВАЖНО ДЛЯ СРАВНЕНИЯ</span><h2>Свет ещё нужно преобразовать</h2><p>Здесь учтён поток у верхней границы атмосферы, до отражения и потерь. Сравнение энергий не означает, что весь этот свет можно собрать и превратить в электричество.</p></article></div>
       <p class="source-line">Расчёт: <a href="https://ember-energy.org/latest-insights/global-electricity-review-2026/" target="_blank" rel="noopener noreferrer">Ember</a> · <a href="https://earth.gsfc.nasa.gov/climate/projects/solar-irradiance/science" target="_blank" rel="noopener noreferrer">NASA</a> · <a href="https://arxiv.org/abs/1510.07674" target="_blank" rel="noopener noreferrer">номинальные константы IAU</a>. ГВт и ТВт — мощность; ТВт·ч — энергия за период.</p>
     </section>
+    <section id="view-ranking" class="view reading-view" aria-label="Рейтинги стран" hidden>
+      <span class="eyebrow">ОДИН ПОКАЗАТЕЛЬ — ОДИН РЕЙТИНГ</span><h1>Страны в цифрах</h1>
+      <p class="lead">Сравнивайте отдельно выработку, ЦОД, энергоблоки и 5G. Общий индекс — прозрачный расчёт атласа.</p>
+      <div class="rank-controls"><label>Показатель<select id="rank-metric"><option value="gen">Выработка, ТВт·ч</option><option value="dc">ЦОД в открытом каталоге</option><option value="reactors">Действующие блоки АЭС</option><option value="build">Строящиеся блоки АЭС</option><option value="g5">5G, % населения</option><option value="index">Общий индекс, 0–100</option></select></label><label id="rank-year-label">Период выработки<select id="rank-year"><option value="2025">Единый год: 2025</option><option value="latest">Последний доступный</option></select></label><label>Найти страну<input id="rank-search" type="search" placeholder="Россия, Китай…"></label></div>
+      <p id="rank-note" class="small muted"></p><div id="rank-pins" class="rank-pins"></div>
+      <div class="table-scroll"><table class="rank-table"><thead><tr><th scope="col">Место</th><th scope="col">Страна</th><th scope="col" id="rank-value-title">ТВт·ч</th><th scope="col">Период</th></tr></thead><tbody id="rank-body"></tbody></table></div>
+      <p class="small muted" id="rank-count"></p>
+      <details class="reading-card"><summary>Как устроен общий индекс</summary><p>Четыре составляющие по 25%: выработка за 2025 год, ЦОД открытого каталога, действующие атомные блоки и охват 5G за 2025 год. Первые три переводятся на шкалу 0–100 по формуле 100 × ln(1 + значение) / ln(1 + максимум). Для 5G используется процент охвата.</p><p>Индекс равен среднему четырёх составляющих. Включаются только страны со всеми четырьмя значениями; отсутствие данных не считается нулём. Нули блоков АЭС — подтверждённое отсутствие в полной таблице PRIS. Логарифм смягчает разницу между крупными и малыми странами.</p><p>Это исследовательский индекс атласа, не официальный рейтинг развития. Он зависит от полноты открытого каталога ЦОД и не оценивает качество связи, надёжность энергосистемы или мощности дата-центров.</p></details>
+    </section>
     <section id="view-future" class="view reading-view" aria-label="Прогнозы" hidden>
-      <span class="eyebrow">ГОРИЗОНТ 2030–2060</span><h1>Больше вычислений.<br><em>Больше энергии.</em></h1><p class="lead">Прогнозы организаций и диапазоны сценариев. Это оценки будущего, а не измеренные результаты.</p>
-      <div class="two-cards"><article class="reading-card forecast-primary"><span class="eyebrow">ЭЛЕКТРИЧЕСТВО ДЛЯ ЦОД</span><h2>485 → 950 <small>ТВт·ч / год</small></h2><div class="growth-track"><i style="width:51%">2025</i><b>2030</b></div><p>Рост примерно на 96% к 2030 году в центральном прогнозе.</p><a href="https://www.iea.org/reports/key-questions-on-energy-and-ai/executive-summary" target="_blank" rel="noopener noreferrer">IEA · апрель 2026 ↗</a></article>
-      <article class="reading-card"><span class="eyebrow">МИРОВОЙ СПРОС</span><h2>+3,6% / +3,8%</h2><p>Ожидаемый рост спроса на электроэнергию в 2026 и 2027 годах.</p><a href="https://www.iea.org/reports/electricity-mid-year-update-2026/executive-summary" target="_blank" rel="noopener noreferrer">IEA · июль 2026 ↗</a></article>
-      <article class="reading-card"><span class="eyebrow">ВИЭ + АТОМ</span><h2>≈50%</h2><p>Прогнозируемая доля в мировой выработке к 2030 году.</p><a href="https://www.iea.org/reports/electricity-2026/executive-summary" target="_blank" rel="noopener noreferrer">IEA · февраль 2026 ↗</a></article>
-      <article class="reading-card"><span class="eyebrow">ПОДКЛЮЧЕНИЯ 5G</span><h2>6,4 млрд</h2><p>Прогноз на 2031 год: мобильные подписки, а не уникальные люди и не площадь покрытия.</p><a href="https://www.ericsson.com/en/reports-and-papers/mobility-report/dataforecasts/mobile-subscriptions-outlook" target="_blank" rel="noopener noreferrer">Ericsson · июнь 2026 ↗</a></article></div>
-      <div class="reading-card"><h2>Атомная мощность: два сценария</h2><svg id="nuclear-chart" class="chart" role="img" aria-label="Прогноз атомной мощности: от 377 ГВт в 2025 до 696–1284 ГВт в 2060"></svg><p class="muted">Низкий и высокий сценарии МАГАТЭ. Диапазон не является доверительным интервалом.</p><a href="https://www.iaea.org/publications/16057/energy-electricity-and-nuclear-power-estimates-for-the-period-up-to-2060" target="_blank" rel="noopener noreferrer">МАГАТЭ · RDS-1/46, сентябрь 2026 ↗</a></div>
+      <span class="eyebrow">ФАКТ → СТРОИТЕЛЬСТВО → ПРОГНОЗ</span><h1>Что будет дальше</h1><p class="lead">Опубликованные прогнозы с датами. Число объектов, мощность и годовая энергия показаны раздельно.</p>
+      <label class="forecast-select">Страна или мир<select id="forecast-country"></select></label>
+      <div id="country-outlook"></div><div id="forecast-cards" class="two-cards"></div>
+      <div class="reading-card"><h2>Атомная мощность: два сценария</h2><svg id="nuclear-chart" class="chart" role="img" aria-label="Диапазон прогноза атомной мощности МАГАТЭ"></svg><p class="muted">Низкий и высокий сценарии МАГАТЭ. ГВт — мощность; этот график не прогнозирует число энергоблоков.</p><a href="https://www.iaea.org/publications/16057/energy-electricity-and-nuclear-power-estimates-for-the-period-up-to-2060" target="_blank" rel="noopener noreferrer">МАГАТЭ · сентябрь 2026 ↗</a></div>
+      <button data-view="space">Космические проекты и прогнозы ↗</button>
+    </section>
+    <section id="view-updates" class="view reading-view" aria-label="Мониторинг и уведомления" hidden>
+      <span class="eyebrow">ОБНОВЛЯЕМЫЙ АТЛАС</span><h1>Данные и уведомления</h1>
+      <div class="reading-card"><h2>Проверка раз в две недели</h2><p id="monitor-status">Настройка мониторинга…</p><p id="data-status" role="status"></p><p class="small muted" id="forecast-watch-status"></p><button id="refresh-data">Проверить новую версию данных</button></div>
+      <div class="reading-card"><h2>Push на iPhone и iPad</h2><p id="push-status" role="status">Проверяем доступность…</p><div class="button-row"><button id="enable-push">Включить уведомления</button><button id="test-push" hidden>Тестовое уведомление</button><button id="disable-push" hidden>Отключить</button></div><p class="small muted">На iPhone и iPad откройте атлас с экрана «Домой», затем нажмите «Включить уведомления» и разрешите их в системном окне. Это нужно сделать на каждом устройстве.</p></div>
+      <details class="reading-card"><summary>Что считается значимым изменением</summary><ul><li>ЦОД каталога: изменение на 5% и не менее 5 объектов.</li><li>Выработка: изменение на 3% в сопоставимом годовом ряду или пересмотр опубликованного значения на 3%.</li><li>АЭС: ввод, закрытие или изменение числа строящихся блоков хотя бы на 1.</li><li>5G: изменение охвата на 5 процентных пунктов.</li><li>Прогнозы: пересмотр на 10% при том же горизонте, перенос срока на год или новый официальный сценарий.</li></ul><p>Пополнение каталога не обязательно означает строительство новых ЦОД. В сообщении указываются источник, период и возможное изменение методики.</p></details>
+      <h2>Журнал изменений</h2><div id="change-log"></div>
+    </section>
+    <section id="view-more" class="view reading-view" aria-label="Другие разделы" hidden>
+      <span class="eyebrow">ЭНЕРГИЯ В МАСШТАБЕ</span><h1>Исследовать дальше</h1><div class="more-grid"><button data-view="sun"><span>☼</span><b>Солнце и Земля</b><small>Сравнение мощности и энергии</small></button><button data-view="space"><span>✧</span><b>Космос</b><small>Орбитальные вычисления и энергетика</small></button><button data-view="updates"><span>↻</span><b>Обновления</b><small>Мониторинг и push-уведомления</small></button><button id="more-about"><span>ⓘ</span><b>Источники</b><small>Определения, даты и установка</small></button></div>
     </section>
     <section id="view-space" class="view reading-view" aria-label="Космические проекты" hidden>
       <span class="eyebrow">ЗА ПРЕДЕЛАМИ ЗЕМНОЙ СЕТИ</span><h1>Вычисления на орбите.<br><em>Энергия за горизонтом.</em></h1><p class="lead">Что уже произошло — и что пока существует как проект. Космические планы не включены в земные энергетические итоги.</p>
@@ -85,15 +104,15 @@
       <div class="reading-card"><h2>Почему космос не даёт бесплатной энергии</h2><p>Солнечный свет нужно собрать, преобразовать и передать. Вычислительные аппараты требуют радиационной защиты и отвода тепла через излучатели; добавляются стоимость запуска и ограничения связи.</p><p>Спутниковая связь NTN расширяет доступность сети. Это отдельная архитектура, а не автоматическое превращение всей планеты в зону наземного 5G.</p><a href="https://www.3gpp.org/news-events/3gpp-news/sa2-artcle" target="_blank" rel="noopener noreferrer">3GPP · NTN, Release 17 ↗</a></div>
     </section>
   </main>
-  <nav class="bottom-nav" aria-label="Разделы"><button data-view="map" aria-current="page"><span>◉</span>Карта</button><button data-view="sun"><span>☼</span>Солнце</button><button data-view="future"><span>↗</span>Прогнозы</button><button data-view="space"><span>✧</span>Космос</button></nav>
+  <nav class="bottom-nav" aria-label="Разделы"><button data-view="map" aria-current="page"><span>◉</span>Карта</button><button data-view="ranking"><span>▤</span>Рейтинг</button><button data-view="future"><span>↗</span>Прогноз</button><button data-view="more"><span>⊕</span>Ещё</button></nav>
   <div class="panel-scrim" id="panel-scrim" hidden></div>
   <dialog id="about-dialog" aria-labelledby="about-title"><div class="dialog-header"><h2 id="about-title">Об атласе</h2><button class="icon-button" id="close-about" aria-label="Закрыть информацию">×</button></div><div class="dialog-body">
-    <p class="eyebrow">СНИМОК ДАННЫХ · 11 ОКТЯБРЯ 2026</p>
+    <p class="eyebrow" id="snapshot-label">ПОСЛЕДНИЕ ДОСТУПНЫЕ ПУБЛИКАЦИИ</p>
     <h3>Установить на iPhone или iPad</h3><p>Откройте сайт в Safari → «Поделиться» → «На экран “Домой”» → «Добавить». Если предлагается, включите «Открывать как веб-приложение».</p>
-    <div class="install-qr"><img src="./assets/qr.png" alt="QR-код со ссылкой на приложение" width="150" height="150"><div><a href="https://evgk724.github.io/neon-energy-atlas/">Открыть приложение ↗</a><p>Интерфейс, данные и обзорная карта сохраняются после первой загрузки. Подробные улицы и внешние источники требуют интернета.</p><p id="offline-status" role="status">Подготовка офлайн-копии…</p></div></div>
+    <div class="install-qr"><img src="./assets/qr.png" alt="QR-код со ссылкой на приложение" width="150" height="150"><div><a href="https://evgk724.github.io/neon-energy-atlas/">Открыть приложение ↗</a><p>Интерфейс, данные и обзорная карта сохраняются после первой загрузки. Внешние источники и новые данные требуют интернета.</p><p id="offline-status" role="status">Подготовка офлайн-копии…</p></div></div>
     <div id="methodology"></div>
-    <p><a href="./data/datacenters.json" download>Координаты ЦОД (JSON)</a> · <a href="./data/nuclear.json" download>Координаты АЭС (JSON)</a></p>
-    <p><a href="https://github.com/EvgK724/neon-energy-atlas" target="_blank" rel="noopener noreferrer">Код и описание на GitHub ↗</a> · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener noreferrer">Исправить карту OSM ↗</a></p><p class="small muted" id="release-label"></p>
+    <p><a href="./data/countries.json" download>Показатели стран и происхождение данных (JSON)</a></p>
+    <p><a href="https://github.com/EvgK724/neon-energy-atlas" target="_blank" rel="noopener noreferrer">Код и описание на GitHub ↗</a></p><p class="small muted" id="release-label"></p>
   </div></dialog>
   <div id="toast" role="status" hidden></div>
   <noscript><p class="reading-card">Для интерактивной карты включите JavaScript в браузере.</p></noscript>

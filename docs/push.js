@@ -1,0 +1,16 @@
+'use strict';
+(async()=>{
+ const $=s=>document.querySelector(s);let config,registration;
+ const set=t=>$('#push-status').textContent=t;
+ const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+ const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+ const token=()=>{let t=localStorage.getItem('atlas-push-device');if(!t){t=Array.from(crypto.getRandomValues(new Uint8Array(32)),x=>x.toString(16).padStart(2,'0')).join('');localStorage.setItem('atlas-push-device',t);}return t;};
+ const decode=s=>{const b=atob(s.replace(/-/g,'+').replace(/_/g,'/').padEnd(Math.ceil(s.length/4)*4,'='));return Uint8Array.from(b,c=>c.charCodeAt(0));};
+ async function api(action,body={}){const r=await fetch(config.endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,token:token(),...body})});if(!r.ok)throw Error('Сервер уведомлений: '+r.status);return r.json();}
+ async function status(){const sub=await registration.pushManager.getSubscription();$('#enable-push').hidden=!!sub;$('#test-push').hidden=!sub;$('#disable-push').hidden=!sub;set(sub?'Подписка этого устройства включена. Уведомления приходят только о значимых изменениях.':'Нажмите кнопку и разрешите уведомления для этого устройства.');}
+ try{config=await fetch('push-config.json',{cache:'no-cache'}).then(r=>r.json());if(!config.enabled){set(config.status);$('#enable-push').disabled=true;return;}if(ios&&!standalone){set('Для push сначала добавьте атлас на экран «Домой» через Safari, затем откройте установленное приложение.');$('#enable-push').disabled=true;return;}if(!('serviceWorker'in navigator)||!('PushManager'in window)||!('Notification'in window)){set('Этот браузер не поддерживает push. Используйте установленный атлас на iPhone/iPad с поддержкой Web Push.');$('#enable-push').disabled=true;return;}registration=await navigator.serviceWorker.ready;await status();}
+ catch(e){set('Не удалось проверить сервер уведомлений. Повторите при подключении к интернету.');$('#enable-push').disabled=true;return;}
+ $('#enable-push').onclick=async()=>{const b=$('#enable-push');b.disabled=true;let created;try{const permission=await Notification.requestPermission();if(permission!=='granted'){set(permission==='denied'?'Уведомления запрещены в системных настройках. Разрешите их для атласа и повторите.':'Разрешение не получено. Можно включить позже.');return;}created=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:decode(config.publicKey)});await api('subscribe',{subscription:created.toJSON()});await status();}catch(e){if(created)await created.unsubscribe();set('Подписка не создана: '+e.message);}finally{b.disabled=false;}};
+ $('#test-push').onclick=async()=>{try{const r=await api('test');set(r.sent?'Тест отправлен службе доставки. Проверьте уведомление на устройстве.':'Служба доставки не приняла тест; попробуйте включить подписку заново.');}catch(e){set(e.message);}};
+ $('#disable-push').onclick=async()=>{try{await api('unsubscribe');const sub=await registration.pushManager.getSubscription();if(sub)await sub.unsubscribe();await status();set('Push для этого устройства отключён.');}catch(e){set('Не удалось отключить подписку на сервере: '+e.message);}};
+})();

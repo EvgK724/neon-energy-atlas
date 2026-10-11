@@ -1,0 +1,100 @@
+name: Atlas update and publish
+on:
+  push:
+    branches: [main]
+    paths: ['docs/**', '.github/workflows/atlas.yml']
+  schedule:
+    - cron: '0 5 * * 0'
+  workflow_dispatch:
+    inputs:
+      refresh:
+        description: 'Refresh current statistics and inspect forecast sources'
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: atlas-pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check fortnightly cadence
+        id: cadence
+        env:
+          EVENT: ${{ github.event_name }}
+          REFRESH: ${{ inputs.refresh }}
+        run: |
+          python3 - <<'PY'
+          import datetime,os
+          today=datetime.datetime.now(datetime.timezone.utc).date()
+          anchor=datetime.date(2026,10,25)
+          due=today>=anchor and (today-anchor).days%14==0
+          event=os.environ['EVENT']
+          refresh=(event=='schedule' and due) or (event=='workflow_dispatch' and os.environ['REFRESH']=='true')
+          publish=event!='schedule' or due
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              f.write('refresh='+str(refresh).lower()+'\n')
+              f.write('publish='+str(publish).lower()+'\n')
+          PY
+      - name: Update statistics
+        if: steps.cadence.outputs.refresh == 'true'
+        id: refresh
+        continue-on-error: true
+        run: python3 scripts/update_data.py --write
+      - name: Inspect published forecasts
+        if: steps.cadence.outputs.refresh == 'true'
+        run: python3 scripts/monitor_forecasts.py
+      - name: Validate country metrics and alert schema
+        if: steps.cadence.outputs.publish == 'true'
+        run: |
+          python3 scripts/test_data.py
+          node scripts/test_metrics.cjs
+          python3 scripts/build.py
+      - name: Commit refreshed snapshot
+        if: steps.cadence.outputs.refresh == 'true'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/data/countries.json docs/data/alerts.json docs/sw.js docs/version.json scripts/forecast-watch.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Refresh atlas statistics and forecast source checks'
+            git push origin HEAD:main
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.cadence.outputs.publish == 'true'
+        with:
+          path: docs
+      - name: Publish atlas
+        if: steps.cadence.outputs.publish == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Verify live data
+        if: steps.cadence.outputs.publish == 'true'
+        run: |
+          python3 - <<'PY'
+          import json,time,urllib.request
+          from pathlib import Path
+          expected=json.loads(Path('docs/data/countries.json').read_text())['meta']['revision']
+          for i in range(6):
+              request=urllib.request.Request('https://evgk724.github.io/neon-energy-atlas/data/countries.json?verify='+str(time.time()),headers={'Cache-Control':'no-cache'})
+              live=json.load(urllib.request.urlopen(request,timeout=30))
+              if live['meta']['revision']==expected:break
+              time.sleep(10)
+          else:raise SystemExit('Published snapshot verification failed')
+          print('Verified live data revision',expected)
+          PY
+      - name: Report partial source failure
+        if: steps.refresh.outcome == 'failure'
+        run: |
+          cat refresh-report.json
+          exit 1

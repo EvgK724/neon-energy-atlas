@@ -1,0 +1,236 @@
+[
+  {
+    "id": "dc-count-limit",
+    "metric": "dc",
+    "countries": [
+      "WORLD",
+      "RUS",
+      "CHN",
+      "USA"
+    ],
+    "scope": "ЦОД · число объектов",
+    "kind": "граница данных",
+    "title": "Прогноз количества",
+    "value": "Не опубликован сопоставимый ряд",
+    "text": "В подключённых первичных источниках нет сопоставимого прогноза числа всех ЦОД по всем странам. Рост мощности и потребления не переносится на количество объектов.",
+    "source": "IEA · Energy and AI",
+    "url": "https://www.iea.org/reports/key-questions-on-energy-and-ai/executive-summary",
+    "publishedAt": "16.04.2026"
+  },
+  {
+    "id": "dc-energy",
+    "metric": "dc",
+    "countries": [
+      "WORLD"
+    ],
+    "scope": "Мир · потребление ЦОД",
+    "kind": "прогноз IEA",
+    "title": "Электричество для вычислений",
+    "value": "485 → 950 ТВт·ч",
+    "baseValue": 485,
+    "targetValue": 950,
+    "targetYear": 2030,
+    "text": "Центральная оценка: потребление за год почти удваивается. Это не выработка и не число зданий ЦОД.",
+    "period": "2025 → 2030",
+    "publishedAt": "16.04.2026",
+    "source": "IEA",
+    "url": "https://www.iea.org/reports/key-questions-on-energy-and-ai/executive-summary"
+  },
+  {
+    "id": "dc-capacity",
+    "metric": "dc",
+    "countries": [
+      "WORLD"
+    ],
+    "scope": "Мир · мощность ЦОД",
+    "kind": "прогноз JLL",
+    "title": "Мощность инфраструктуры",
+    "value": "103 → 200 ГВт",
+    "baseValue": 103,
+    "targetValue": 200,
+    "targetYear": 2030,
+    "text": "Прогноз суммарной мощности colocation, hyperscale и других типов ЦОД. Один крупный объект может заменить несколько малых; из ГВт число объектов не вычисляется.",
+    "period": "2025 → 2030",
+    "publishedAt": "06.01.2026",
+    "source": "JLL",
+    "url": "https://www.jll.com/en-uk/newsroom/global-data-center-sector-to-nearly-double-to-200gw-amid-ai-infrastructure-boom"
+  },
+  {
+    "id": "world-demand",
+    "metric": "gen",
+    "countries": [
+      "WORLD"
+    ],
+    "scope": "Мир · спрос",
+    "kind": "прогноз IEA",
+    "title": "Рост потребления электричества",
+    "value": "+3,6% / +3,8%",
+    "targetValue": 3.8,
+    "targetYear": 2027,
+    "text": "Ожидаемый рост спроса в 2026 и 2027. Прогноз спроса нельзя называть валовой выработкой: категории отличаются потерями и собственными нуждами.",
+    "period": "2026 / 2027",
+    "publishedAt": "23.07.2026",
+    "source": "IEA · июльское обновление",
+    "url": "https://www.iea.org/reports/electricity-mid-year-update-2026/executive-summary"
+  },
+  {
+    "id": "solar-generation",
+    "metric": "gen",
+    "countries": [
+      "WORLD"
+    ],
+    "scope": "Мир · выработка солнечных станций",
+    "kind": "прогноз IEA",
+    "title": "Прирост солнечной генерации",
+    "value": "≈+600 ТВт·ч ежегодно",
+    "targetValue": 600,
+    "targetYear": 2027,
+    "text": "Ожидаемый прирост в 2026 году и близкий прирост в 2027. Это добавленная годовая выработка, а не её полный объём.",
+    "period": "2026–2027",
+    "publishedAt": "23.07.2026",
+    "source": "IEA",
+    "url": "https://www.iea.org/reports/electricity-mid-year-update-2026/executive-summary"
+  },
+  {
+    "id": "nuclear-generation",
+    "metric": "gen",
+    "countries": [
+      "WORLD"
+    ],
+    "scope": "Мир · атомная выработка",
+    "kind": "прогноз IEA",
+    "title": "Рост атомной генерации",
+    "value": ">4% в 2027",
+    "targetValue": 4,
+    "qualifier": "more_than",
+    "targetYear": 2027,
+    "text": "Прогноз прироста выработки атомных станций. Число блоков при этом не обязано расти тем же темпом.",
+    "period": "2027",
+    "publishedAt": "23.07.2026",
+    "source": "IEA",
+    "url": "https://www.iea.org/reports/electricity-mid-year-update-2026/executive-summary"
+  },
+  {
+    "id": "clean-share",
+    "metric": "gen",
+    "countries": [
+      "WORLD"
+    ],
+    "scope": "Мир · структура выработки",
+    "kind": "прогноз IEA",
+    "title": "ВИЭ и атом вместе",
+    "value": "≈50% к 2030",
+    "targetValue": 50,
+    "targetYear": 2030,
+    "text": "Прогноз доли в мировой выработке. Сопоставимый полный прогноз валовой выработки всех стран в подключённых открытых источниках не представлен.",
+    "period": "2030",
+    "publishedAt": "06.02.2026",
+    "source": "IEA · Electricity 2026",
+    "url": "https://www.iea.org/reports/electricity-2026/executive-summary"
+  },
+  {
+    "id": "nuclear-fleet-limit",
+    "metric": "reactors",
+    "countries": [
+      "WORLD"
+    ],
+    "scope": "Мир · число блоков",
+    "kind": "граница данных",
+    "title": "Стройки не равны будущему парку",
+    "value": "417 действуют · 78 строятся",
+    "text": "Официального единого прогноза количества действующих блоков мира на 2030/2040 в исследованных источниках не найдено. Плановая дата ввода заполнена лишь у 6 из 78 строек PRIS. Сценарии МАГАТЭ ниже даны в ГВт.",
+    "source": "МАГАТЭ PRIS",
+    "url": "https://pris-stats.iaea.org/",
+    "publishedAt": "проверено 11.10.2026"
+  },
+  {
+    "id": "g5-subscriptions",
+    "metric": "g5",
+    "countries": [
+      "WORLD"
+    ],
+    "scope": "Мир · 5G",
+    "kind": "прогноз Ericsson",
+    "title": "Мобильные подписки 5G",
+    "value": "6,4 млрд к 2031",
+    "targetValue": 6.4,
+    "targetYear": 2031,
+    "text": "Подписки, а не уникальные люди. Один человек может иметь несколько подключений; это отдельный показатель от процента охвата.",
+    "period": "2031",
+    "publishedAt": "июнь 2026",
+    "source": "Ericsson Mobility Report",
+    "url": "https://www.ericsson.com/en/reports-and-papers/mobility-report/dataforecasts/mobile-subscriptions-outlook"
+  },
+  {
+    "id": "nuclear-target-RUS",
+    "metric": "reactors",
+    "countries": [
+      "RUS"
+    ],
+    "scope": "Россия · блоки АЭС",
+    "kind": "официальная программа",
+    "title": "План ввода 38 новых энергоблоков до 2042 года",
+    "value": "38 блоков",
+    "targetValue": 38,
+    "targetYear": 2042,
+    "text": "Вводы по генеральной схеме, принятой в декабре 2024; не итоговое число действующих блоков и не оставшиеся вводы после 11.10.2026. Не прибавлять 38 к текущим 34: программа имеет другую базовую дату, включает замещение выводимых блоков.",
+    "period": "до 2042",
+    "source": "официальный первоисточник",
+    "url": "https://report.rosatom.ru/go/atomenergoprom/go_atomenergoprom_2024/aepk_2024.pdf",
+    "publishedAt": "2024 annual report, published 2025"
+  },
+  {
+    "id": "nuclear-target-USA",
+    "metric": "reactors",
+    "countries": [
+      "USA"
+    ],
+    "scope": "США · блоки АЭС",
+    "kind": "официальная программа",
+    "title": "Цель: 10 новых крупных реакторов в строительстве к 2030 году",
+    "value": "10 блоков",
+    "targetValue": 10,
+    "targetYear": 2030,
+    "text": "Начало строительства, а не ввод в эксплуатацию. Не означает 104 работающих реактора в 2030.",
+    "period": "до 2030",
+    "source": "официальный первоисточник",
+    "url": "https://www.energy.gov/ne/articles/one-year-after-executive-orders-us-nuclear-energy-renaissance-full-swing",
+    "publishedAt": "2026-05-23"
+  },
+  {
+    "id": "nuclear-target-IND",
+    "metric": "reactors",
+    "countries": [
+      "IND"
+    ],
+    "scope": "Индия · блоки АЭС",
+    "kind": "официальная программа",
+    "title": "17 реакторов на различных стадиях реализации: поэтапное завершение к 2031–2032",
+    "value": "17 блоков",
+    "targetValue": 17,
+    "targetYear": 2032,
+    "text": "Программа, указанная правительством 05.02.2026, включая PFBR; не равна 8 объектам PRIS со статусом Under Construction и не является прогнозом итогового парка.",
+    "period": "до 2032",
+    "source": "официальный первоисточник",
+    "url": "https://www.pib.gov.in/PressReleaseIframePage.aspx?PRID=2223785&lang=2&reg=48",
+    "publishedAt": "2026-02-05"
+  },
+  {
+    "id": "nuclear-target-CHN",
+    "metric": "reactors",
+    "countries": [
+      "CHN"
+    ],
+    "scope": "Китай · блоки АЭС",
+    "kind": "граница данных",
+    "title": "Сопоставимый официальный прогноз числа блоков не подтверждён",
+    "value": "37 строятся сейчас",
+    "targetValue": null,
+    "targetYear": 2030,
+    "text": "Текущий проверенный портфель PRIS: 37 строящихся блоков. Цель 110 ГВт к 2030 задаёт мощность, её нельзя превращать в число энергоблоков.",
+    "period": "до 2030",
+    "source": "официальный первоисточник",
+    "url": "https://www.digitalchina.gov.cn/2026/english/dn/202607/t20260715_5346949.htm",
+    "publishedAt": "2026-07-15"
+  }
+]

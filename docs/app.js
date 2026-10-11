@@ -1,212 +1,82 @@
 'use strict';
 (() => {
-  const $ = s => document.querySelector(s);
-  const $$ = s => [...document.querySelectorAll(s)];
-  const fmt = (n,d=0) => n == null ? 'Нет данных' : new Intl.NumberFormat('ru-RU',{maximumFractionDigits:d}).format(n);
-  const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const safeURL = s => { try { const u=new URL(s);return u.protocol==='https:'?u.href:'#'; } catch { return '#'; } };
-  const color = n => ['','#46dded','#ffae68','#c38bff','#b2f681'][n];
-  const root = document;
-  const STORE='neon-energy-atlas-v1';
-  let state={layers:{gen:true,dc:true,g5:true,nuclear:true},country:'WORLD',view:'map',nuclear:'all',dc:'active',streets:true};
-  try { const old=JSON.parse(localStorage.getItem(STORE));if(old){state={...state,...old,layers:{...state.layers,...old.layers}};} } catch {}
-  if(!['map','sun','future','space'].includes(state.view))state.view='map';
-  if(!['all','operating','construction'].includes(state.nuclear))state.nuclear='all';
-  if(!['active','all','functional','construction','proposed'].includes(state.dc))state.dc='active';
+  const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],root=document;
+  const fmt=(n,d=0)=>n==null?'Нет данных':new Intl.NumberFormat('ru-RU',{maximumFractionDigits:d}).format(n);
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const safeURL=s=>{try{const u=new URL(s);return u.protocol==='https:'?u.href:'#';}catch{return '#';}};
+  const date=s=>s?new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',timeZone:'UTC'}).format(new Date(s)):'дата не указана';
+  const color=n=>['','#46dded','#ffae68','#c38bff','#b2f681'][n];
+  const M=AtlasMetrics,STORE='neon-energy-atlas-v2',layerKeys={gen:'gen',dc:'dc',nuclear:'reactors',g5:'g5'};
+  let state={layers:{gen:true,dc:true,g5:true,nuclear:true},country:'WORLD',view:'map',focus:'gen',rank:'gen',rankYear:'2025',forecast:'WORLD'};
+  try{const old=JSON.parse(localStorage.getItem(STORE)||localStorage.getItem('neon-energy-atlas-v1'));if(old)state={...state,...old,layers:{...state.layers,...old.layers}};}catch{}
+  if(!['map','ranking','sun','future','space','more','updates'].includes(state.view))state.view='map';
+  if(!M.specs[state.focus])state.focus='gen';if(!M.specs[state.rank])state.rank='gen';
   const save=()=>{try{localStorage.setItem(STORE,JSON.stringify(state));}catch{}};
-  let map, country, world, dcData, nuclearData, geo, baseLayer, genLayer, g5Layer, outlineLayer, labels, streets;
-  let dcMarkers=[], nuclearMarkers=[], dcGroup, nuclearGroup, chosenMarker;
-  let expanded=false, lastPanelFocus, toastTimer, initialized=false;
+  let dataset,country,world,geo,map,baseLayer,fillLayer,outlineLayer,labels,initialized=false,expanded=false,toastTimer,lastPanelFocus,refreshing=false,lastFetch=0;
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const nameOf=s=>s.nameRu||s.nameLocal||s.name||'ЦОД без названия';
-  const countryName=c=>country?.[c]?.name||c||'Страна не определена';
-  const statusNames={functional:'Действующий по тегам OSM',construction:'В строительстве',proposed:'Проект',inactive:'Не действует',operating:'Эксплуатационный статус',mixed:'Эксплуатация + строительство'};
-  function toast(s){$('#toast').textContent=s;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,3800);}
-  function panel(open,focusSearch=false){
-    if(open)lastPanelFocus=document.activeElement;
-    document.body.classList.toggle('layers-open',open);$('#layers-button').setAttribute('aria-expanded',String(open));
-    $('#panel-scrim').hidden=!open||innerWidth>760;
-    if(open && innerWidth<=760){$('#layer-panel').setAttribute('role','dialog');$('#layer-panel').setAttribute('aria-modal','true');}
-    else{$('#layer-panel').removeAttribute('role');$('#layer-panel').removeAttribute('aria-modal');}
-    if(open)setTimeout(()=>$(focusSearch?'#site-search':innerWidth<=760?'#close-layers':'#site-search').focus(),20);
-    else if(lastPanelFocus?.isConnected)lastPanelFocus.focus({preventScroll:true});
-  }
-  $('#layers-button').onclick=()=>panel(!document.body.classList.contains('layers-open'));
-  $('#close-layers').onclick=()=>panel(false);$('#panel-scrim').onclick=()=>panel(false);
-  $('#search-button').onclick=()=>panel(true,true);
-  document.addEventListener('keydown',e=>{
-    if(e.key==='Escape'){if(document.body.classList.contains('layers-open'))panel(false);else if(expanded)expand(false);}
-    if(e.key==='Tab'&&innerWidth<=760&&document.body.classList.contains('layers-open')){
-      const f=[...$('#layer-panel').querySelectorAll('button,input,select,a')].filter(x=>x.offsetParent!==null&&!x.disabled);
-      if(e.shiftKey&&document.activeElement===f[0]){e.preventDefault();f.at(-1).focus();}
-      else if(!e.shiftKey&&document.activeElement===f.at(-1)){e.preventDefault();f[0].focus();}
-    }
-  });
+  function toast(t){$('#toast').textContent=t;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,6000);}
+  function panel(open){if(open)lastPanelFocus=document.activeElement;document.body.classList.toggle('layers-open',open);$('#layers-button').setAttribute('aria-expanded',String(open));$('#panel-scrim').hidden=!open||innerWidth>760;
+    if(open&&innerWidth<=760){$('#layer-panel').setAttribute('role','dialog');$('#layer-panel').setAttribute('aria-modal','true');$('#close-layers').focus();}else{$('#layer-panel').removeAttribute('role');$('#layer-panel').removeAttribute('aria-modal');if(lastPanelFocus?.isConnected)lastPanelFocus.focus({preventScroll:true});}}
+  $('#layers-button').onclick=()=>panel(!document.body.classList.contains('layers-open'));$('#close-layers').onclick=()=>panel(false);$('#panel-scrim').onclick=()=>panel(false);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(document.body.classList.contains('layers-open'))panel(false);else if(expanded)expand(false);}if(e.key==='Tab'&&innerWidth<=760&&document.body.classList.contains('layers-open')){const f=[...$('#layer-panel').querySelectorAll('button,input,select,a')].filter(x=>x.offsetParent!==null&&!x.disabled);if(e.shiftKey&&document.activeElement===f[0]){e.preventDefault();f.at(-1).focus();}else if(!e.shiftKey&&document.activeElement===f.at(-1)){e.preventDefault();f[0].focus();}}});
   function about(){panel(false);$('#about-dialog').showModal();}
-  $('#about-button').onclick=about;$('#method-button').onclick=about;$('#close-about').onclick=()=>$('#about-dialog').close();
-  $('#about-dialog').addEventListener('click',e=>{if(e.target===$('#about-dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
-  function view(id,scroll=true){
-    state.view=id;$$('.view').forEach(v=>v.hidden=v.id!=='view-'+id);
-    $$('[data-view]').forEach(b=>{if(b.dataset.view===id)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
-    if(expanded&&id!=='map')expand(false);panel(false);if(scroll)window.scrollTo({top:0,behavior:'instant'});
-    if(id==='map')requestAnimationFrame(()=>map?.invalidateSize({pan:false}));
-    if(id==='sun'&&world)drawSun();if(id==='future'&&world)drawNuclear();save();
-  }
+  $('#about-button').onclick=about;$('#more-about').onclick=about;$('#method-button').onclick=about;$('#close-about').onclick=()=>$('#about-dialog').close();
+  function view(id,scroll=true){state.view=id;$$('.view').forEach(v=>v.hidden=v.id!=='view-'+id);const nav=['sun','space','updates'].includes(id)?'more':id;$$('.bottom-nav [data-view]').forEach(b=>{if(b.dataset.view===nav)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});if(expanded&&id!=='map')expand(false);panel(false);if(scroll)window.scrollTo({top:0,behavior:'instant'});if(id==='map')requestAnimationFrame(()=>{map?.invalidateSize({pan:false});renderLabels();});if(id==='sun'&&world)drawSun();if(id==='future'&&world){forecasts();drawNuclear();}if(id==='ranking'&&country)ranks();save();}
   $$('[data-view]').forEach(b=>b.onclick=()=>view(b.dataset.view));
-  function expand(open){expanded=open;document.body.classList.toggle('map-full',open);$('#expand-map').setAttribute('aria-pressed',String(open));$('#expand-map').setAttribute('aria-label',open?'Свернуть карту':'Развернуть карту');requestAnimationFrame(()=>map.invalidateSize({pan:false}));}
-  $('#expand-map').onclick=()=>expand(!expanded);
-  function dcVisible(s){return state.dc==='all'||(state.dc==='active'?['functional','construction'].includes(s.status):s.status===state.dc);}
-  function nuclearVisible(s){return state.nuclear==='all'||(state.nuclear==='operating'?s.operatingUnits>0:s.constructionUnits>0);}
-  function cluster(kind){return L.markerClusterGroup({maxClusterRadius:kind==='dc'?48:38,showCoverageOnHover:false,spiderfyOnMaxZoom:true,spiderfyDistanceMultiplier:1.7,removeOutsideVisibleBounds:true,animate:!reduced,disableClusteringAtZoom:kind==='dc'?16:12,iconCreateFunction:c=>L.divIcon({html:fmt(c.getChildCount()),className:'cluster-icon '+kind,iconSize:[42,42],iconAnchor:[21,21]})});}
-  function markerPopup(s,kind){
-    const isN=kind==='nuclear',title=nameOf(s),place=[countryName(s.country),s.city||s.subnational].filter(Boolean).join(' · ');
-    let details='';
-    if(isN){
-      details=`<p>Блоки в этой точке: <b>${fmt(s.operatingUnits)}</b> в эксплуатации; <b>${fmt(s.constructionUnits)}</b> в строительстве.</p><p>Номинальная мощность: ${fmt(s.operatingMW)} МВт + ${fmt(s.constructionMW)} МВт строящихся блоков.</p>`;
-      if(s.projectPointCount>1)details+=`<p>Группа блоков: ${esc(s.unitNames.join(', '))}. У этого проекта несколько координат.</p>`;
-      if(s.noteRu)details+=`<p>${esc(s.noteRu)}</p>`;
-      details+=`<small>${s.accuracy==='approximate'?'⚠ Приблизительные координаты по GEM.':'Точка площадки по GEM (категория exact).'} Статус каталога не подтверждает текущую генерацию.</small>`;
-    }else{
-      if(s.operator)details+=`<p>Оператор: ${esc(s.operator)}</p>`;
-      details+=`<p>${esc(statusNames[s.status]||s.status)}.</p><small>${s.accuracy==='osm_node'?'Исходная точка OSM.':'Центр контура здания или площадки OSM.'} Метки сообщества могут содержать ошибки; кампус иногда представлен несколькими точками.</small>`;
-    }
-    return `<span class="eyebrow" style="color:${isN?color(4):color(2)}">${isN?'АТОМНАЯ ЭНЕРГЕТИКА · GEM':'ДАТА-ЦЕНТР · OPENSTREETMAP'}</span><h3>${esc(title)}</h3><small>${esc(place)}</small>${details}<p class="coord">${fmt(s.lat,5)}°, ${fmt(s.lon,5)}°</p><a href="${esc(safeURL(s.sourceUrl))}" target="_blank" rel="noopener noreferrer">Карточка источника ↗</a>`;
-  }
-  function makeMarker(s,kind){
-    const extra=(['construction','proposed','inactive'].includes(s.status)?' '+s.status:'')+(s.accuracy==='approximate'?' approximate':'');
-    const m=L.marker([s.lat,s.lon],{icon:L.divIcon({html:'<i></i>',className:'map-marker '+kind+extra,iconSize:[44,44],iconAnchor:[22,22]}),title:nameOf(s),alt:nameOf(s),keyboard:true,riseOnHover:true});
-    m.site=s;m.kind=kind;m.bindPopup(()=>markerPopup(s,kind),{maxWidth:330,minWidth:220,autoPanPadding:[17,23]});
-    m.on('click',()=>{chosenMarker=m;if(s.country&&country[s.country])chooseCountry(s.country,false);});
-    return m;
-  }
-  function updatePoints(){
-    dcGroup.clearLayers();nuclearGroup.clearLayers();
-    dcGroup.addLayers(dcMarkers.filter(m=>dcVisible(m.site)));
-    nuclearGroup.addLayers(nuclearMarkers.filter(m=>nuclearVisible(m.site)));
-    updateLayers(false);
-  }
-  function genColor(v){if(v==null)return '#253445';return d3.interpolateRgb('#102c3a','#46dded')(Math.min(1,Math.log10(v+1)/Math.log10(11001)));}
-  function genStyle(f){const d=country[f.properties.iso];return{stroke:false,fill:true,fillColor:genColor(d?.year>=2023?d.gen:null),fillOpacity:map.getZoom()>=6?.16:.83,interactive:true};}
-  function g5Style(f){const v=country[f.properties.iso]?.g5;return{color:v==null?'#687788':d3.interpolateRgb('#536476',color(3))(v/100),weight:v==null?1:1+v/85,opacity:map.getZoom()>=6?.25:.85,fill:false,dashArray:v==null?'2 6':v===0?'2 5':null};}
-  function updateLayers(persist=true){
-    const all={gen:genLayer,g5:g5Layer,dc:dcGroup,nuclear:nuclearGroup};
-    for(const [k,l] of Object.entries(all)){if(state.layers[k]){if(!map.hasLayer(l))l.addTo(map);}else if(map.hasLayer(l))map.removeLayer(l);}
-    $$('[data-layer]').forEach(b=>b.setAttribute('aria-pressed',String(!!state.layers[b.dataset.layer])));
-    $('#layer-count').textContent=Object.values(state.layers).filter(Boolean).length;
-    legend();profile();mapStatus();if(persist)save();
-  }
-  function legend(){
-    let h='';
-    if(state.layers.gen)h+=`<div class="legend-row"><span class="legend-title">Цвет · выработка, ТВт·ч</span><div class="gradient" style="background:linear-gradient(to right,${[1,10,100,1000,10000].map(genColor).join(',')})"></div><div class="legend-ticks"><span>1</span><span>10</span><span>100</span><span>1 тыс.</span><span>10 тыс.</span></div><small>Логарифмическая шкала · серый: нет свежих данных</small></div>`;
-    if(state.layers.g5)h+='<div class="legend-row"><span class="legend-title">Границы · 5G, % населения</span><div class="gradient" style="background:linear-gradient(to right,#536476,#c38bff)"></div><div class="legend-ticks"><span>0%</span><span>50%</span><span>100%</span></div><small>Пунктир: 0% или нет данных. Точное значение — в карточке страны.</small></div>';
-    if(state.layers.dc)h+='<div class="legend-row"><span class="legend-title"><span class="legend-icon" style="color:var(--orange)">●</span>ЦОД · объект OSM</span><small>Число в круге — группа точек. Нажмите, чтобы приблизить.</small></div>';
-    if(state.layers.nuclear)h+='<div class="legend-row"><span class="legend-title"><span class="legend-icon" style="color:var(--lime)">▲</span>АЭС · группы блоков</span><small>Зелёный: эксплуатация или смешанный статус. Голубой: строительство. Бледный: приблизительные координаты.</small></div>';
-    if(!h)h='<p class="small muted">Включите любой слой. Обзорная карта остаётся доступна.</p>';
-    $('#legend').innerHTML=h;
-  }
-  function profile(){
-    const w=state.country==='WORLD',d=w?world:country[state.country];if(!d)return;
-    $('#country-select').value=state.country;$('#profile-name').textContent=w?'Весь мир':d.name;
-    $('#profile-year').textContent='Выработка '+(d.year||'—')+' · разные даты слоёв';
-    const entries=[['Выработка, ТВт·ч',fmt(d.gen,d.gen<10?2:0),'Ember · '+(d.year||'—'),1],['ЦОД, каталог',w?'≈12 300':fmt(d.dc),'Data Center Map · 2026',2],['5G, % населения',fmt(d.g5,1),(w?'ITU':'GSMA')+' · 2025',3],['АЭС, блоков',fmt(d.reactors),'МАГАТЭ · конец 2025',4]];
-    $('#metrics').innerHTML=entries.map(([t,v,n,c])=>`<div class="metric" style="--mc:${color(c)}"><span>${t}</span><strong>${v}</strong><small>${n}</small></div>`).join('');
-    const notes=[];if(!w&&d.year===2025)notes.push('Доля мировой выработки: '+fmt(100*d.gen/world.gen,2)+'%.');
-    if(d.nuclear!=null&&d.gen>0)notes.push('Атомная выработка: '+fmt(d.nuclear,1)+' ТВт·ч ('+fmt(100*d.nuclear/d.gen,1)+'%).');
-    if(d.solar!=null)notes.push('Солнечная: '+fmt(d.solar,1)+' ТВт·ч.');
-    if(state.country==='RUS')notes.push('5G: значение GSMA за 2025 год; пилотные сети не равны массовому охвату.');
-    if(state.country==='CHN')notes.push('4,838 млн базовых станций 5G к концу 2025 года (MIIT).');
-    if(d.year&&d.year<2023)notes.push('Выработка архивная, на карте не окрашена.');
-    $('#profile-note').textContent=notes.join(' ');
-    const ds=dcData.sites.filter(s=>(w||s.country===state.country)&&dcVisible(s));
-    const ns=nuclearData.sites.filter(s=>(w||s.country===state.country)&&nuclearVisible(s));
-    const projects=new Set(ns.map(s=>s.projectId)).size;
-    $('#point-counts').textContent='В выбранных фильтрах: '+fmt(ds.length)+' точек ЦОД (OSM) · '+fmt(ns.length)+' точек АЭС / '+fmt(projects)+' проектов (GEM). Координатные каталоги отличаются от статистики выше.';
-  }
-  function countryClick(f,e){const id=f.properties.iso,d=country[id];if(!d)return;chooseCountry(id,false);L.popup({maxWidth:260}).setLatLng(e.latlng).setContent(`<h3>${esc(d.name)}</h3><p>Выработка: <b>${fmt(d.gen,d.gen<10?2:0)} ТВт·ч</b> · ${esc(d.year||'нет года')}<br>5G: <b>${fmt(d.g5,1)}%</b> населения · 2025</p><small>Все показатели страны — под картой.</small>`).openOn(map);}
-  function onCountry(f,l){l.on('click',e=>countryClick(f,e));}
-  function chooseCountry(id,zoom=true){
-    if(id!=='WORLD'&&!country[id])id='WORLD';state.country=id;profile();outlineLayer.clearLayers();
-    if(id==='WORLD'){if(zoom)worldView();}
-    else{
-      const fs=geo.features.filter(f=>f.properties.iso===id);if(fs.length)outlineLayer.addData({type:'FeatureCollection',features:fs});
-      if(zoom){
-        map.closePopup();const custom={RUS:[[42,19],[77,180]],USA:[[24,-126],[50,-65]],FRA:[[41,-5],[52,10]]};
-        if(custom[id])map.fitBounds(custom[id],{padding:[25,25],animate:!reduced,maxZoom:7});
-        else if(fs.length)map.fitBounds(outlineLayer.getBounds(),{padding:[25,25],animate:!reduced,maxZoom:7});
-        else if(country[id].ll)map.setView([country[id].ll[1],country[id].ll[0]],7,{animate:!reduced});
-      }
-    }save();
-  }
-  function worldView(){map.fitBounds([[-58,-180],[81,180]],{padding:[15,20],animate:false});}
-  function mapStatus(){
-    const ds=state.layers.dc?dcGroup.getLayers().length:0,ns=state.layers.nuclear?nuclearGroup.getLayers().length:0;
-    $('#map-status').textContent=(navigator.onLine?'':'Без сети · ')+fmt(ds)+' ЦОД · '+fmt(ns)+' точек АЭС';
-    const close=map.getZoom()>=6;
-    $('#map-hint').textContent=close?(navigator.onLine&&state.streets?'Нажмите на объект: название, статус, координаты и источник':'Обзорная карта · подробные улицы доступны с интернетом'):'Два пальца — масштаб · число в круге — группа объектов';
-  }
-  function detailMap(){
-    const show=state.streets&&map.getZoom()>=6&&navigator.onLine;
-    if(show&&!map.hasLayer(streets))streets.addTo(map);else if(!show&&map.hasLayer(streets))map.removeLayer(streets);
-    genLayer.setStyle(genStyle);g5Layer.setStyle(g5Style);mapStatus();
-  }
-  function zoomToSite(m){
-    if(state.view!=='map')view('map');
-    const k=m.kind;if(!state.layers[k])state.layers[k]=true;
-    if(k==='dc'&&!dcVisible(m.site)){state.dc='all';$('#dc-filter').value='all';}
-    if(k==='nuclear'&&!nuclearVisible(m.site)){state.nuclear='all';$('#nuclear-filter').value='all';}
-    updatePoints();panel(false);chosenMarker=m;
-    if(m.site.country&&country[m.site.country])chooseCountry(m.site.country,false);
-    map.setView(m.getLatLng(),k==='dc'?16:12,{animate:false});
-    (k==='dc'?dcGroup:nuclearGroup).zoomToShowLayer(m,()=>m.openPopup());save();
-  }
-  function search(){
-    const q=$('#site-search').value.trim().toLocaleLowerCase('ru');
-    if(q.length<2){$('#search-results').replaceChildren();return;}
-    const found=[...nuclearMarkers,...dcMarkers].filter(m=>m.searchText.includes(q));
-    const frag=document.createDocumentFragment();
-    for(const m of found.slice(0,25)){
-      const b=document.createElement('button');b.type='button';b.textContent=nameOf(m.site);
-      const s=document.createElement('small');s.textContent=(m.kind==='dc'?'ЦОД':'АЭС')+' · '+countryName(m.site.country)+(m.site.city?' · '+m.site.city:'');b.append(s);b.onclick=()=>zoomToSite(m);frag.append(b);
-    }
-    const note=document.createElement('p');note.className='small muted';note.textContent=found.length?(found.length>25?'Первые 25 из '+fmt(found.length)+' результатов. Уточните название.':fmt(found.length)+' результатов. Поиск по всем статусам.'):'В этом снимке совпадений нет. Попробуйте другое название или город.';frag.append(note);$('#search-results').replaceChildren(frag);
-  }
-  function setupMap(){
-    map=L.map('map',{zoomControl:false,attributionControl:true,minZoom:0,maxZoom:18,zoomSnap:.25,zoomDelta:1,worldCopyJump:false,maxBounds:[[-85,-210],[85,210]],maxBoundsViscosity:.7,preferCanvas:true,tapHold:false,zoomAnimation:!reduced,fadeAnimation:!reduced});
-    map.attributionControl.setPrefix(false);map.attributionControl.addAttribution('<a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OSM</a> · <a href="https://globalenergymonitor.org/projects/global-nuclear-power-tracker" target="_blank" rel="noopener">GEM</a>');
-    for(const [n,z] of [['base',210],['streets',250],['generation',310],['coverage',330],['selection',350],['labels',370]])map.createPane(n).style.zIndex=z;
-    map.getPane('streets').classList.add('street-tiles');map.getPane('labels').style.pointerEvents='none';
-    baseLayer=L.geoJSON(geo,{pane:'base',style:{color:'#38536a',weight:.6,fillColor:'#122338',fillOpacity:1},onEachFeature:onCountry}).addTo(map);
-    genLayer=L.geoJSON(geo,{pane:'generation',style:genStyle,onEachFeature:onCountry});
-    g5Layer=L.geoJSON(geo,{pane:'coverage',style:g5Style,onEachFeature:onCountry});
-    outlineLayer=L.geoJSON(null,{pane:'selection',style:{color:'#f0faff',weight:1.8,fill:false,interactive:false}}).addTo(map);
-    streets=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{pane:'streets',maxZoom:19,noWrap:true,keepBuffer:1,updateWhenIdle:true});
-    streets.on('tileerror',()=>{$('#map-hint').textContent='Улицы сейчас недоступны · точки и обзорная карта работают';});
-    labels=L.layerGroup().addTo(map);
-    [['США',38,-102],['РОССИЯ',64,89],['КИТАЙ',36,103],['БРАЗИЛИЯ',-11,-51],['АВСТРАЛИЯ',-25,134]].forEach(([n,lat,lon])=>L.marker([lat,lon],{pane:'labels',interactive:false,icon:L.divIcon({className:'country-label',html:esc(n),iconSize:[95,14],iconAnchor:[45,7]})}).addTo(labels));
-    dcGroup=cluster('dc');nuclearGroup=cluster('nuclear');
-    dcMarkers=dcData.sites.map(s=>makeMarker(s,'dc'));nuclearMarkers=nuclearData.sites.map(s=>makeMarker(s,'nuclear'));
-    for(const m of [...dcMarkers,...nuclearMarkers])m.searchText=[m.site.name,m.site.nameRu,m.site.nameLocal,m.site.operator,m.site.city,m.site.subnational,countryName(m.site.country),m.site.id].filter(Boolean).join(' ').toLocaleLowerCase('ru');
-    map.setView([25,20],1);worldView();
-    updatePoints();
-    if(state.mapView&&Number.isFinite(state.mapView.lat)&&Number.isFinite(state.mapView.lon)&&Number.isFinite(state.mapView.zoom))map.setView([Math.max(-80,Math.min(80,state.mapView.lat)),Math.max(-180,Math.min(180,state.mapView.lon))],Math.max(0,Math.min(18,state.mapView.zoom)),{animate:false});
-    else if(state.country!=='WORLD')chooseCountry(state.country,true);
-    map.on('moveend',()=>{const c=map.getCenter();state.mapView={lat:c.lat,lon:c.lng,zoom:map.getZoom()};save();});
-    map.on('zoomend',()=>{detailMap();if(map.getZoom()>4){if(map.hasLayer(labels))map.removeLayer(labels);}else if(!map.hasLayer(labels))labels.addTo(map);});
-    L.control.scale({imperial:false,maxWidth:100,position:'bottomleft'}).addTo(map);
+  function expand(open){expanded=open;document.body.classList.toggle('map-full',open);$('#expand-map').setAttribute('aria-pressed',String(open));$('#expand-map').setAttribute('aria-label',open?'Свернуть карту':'Развернуть карту');requestAnimationFrame(()=>map.invalidateSize({pan:false}));}$('#expand-map').onclick=()=>expand(!expanded);
+  function period(c,k){const s=dataset.sources[k==='g5'&&c===world?'itu':M.specs[k]?.source];if(k==='gen')return String(c.year||'—');if(k==='g5')return String(s?.period||'2025');return s?.asOf?date(s.asOf):'получено '+date(s?.retrievedAt);}
+  function activeMetrics(){return Object.entries(layerKeys).filter(([k])=>state.layers[k]).map(([,m])=>m);}
+  function metricColor(v,k){if(v==null)return '#283441';const p=k==='g5'?v/100:Math.log1p(v)/Math.log1p(Math.max(1,...Object.values(country).map(c=>c[k]||0)));return d3.interpolateRgb('#101f33',M.specs[k].color)(.09+.84*Math.max(0,Math.min(1,p)));}
+  function style(f){const c=country[f.properties.iso],v=c?.[state.focus];return{color:'#466477',weight:.65,fillColor:metricColor(state.focus==='gen'&&c?.year<2023?null:v,state.focus),fillOpacity:activeMetrics().includes(state.focus)?.86:0,interactive:true};}
+  function setupMap(){map=L.map('map',{zoomControl:false,attributionControl:true,minZoom:0,maxZoom:7,zoomSnap:.25,zoomDelta:1,maxBounds:[[-85,-205],[85,205]],maxBoundsViscosity:.7,preferCanvas:true,tapHold:false,zoomAnimation:!reduced});map.attributionControl.setPrefix(false);map.attributionControl.addAttribution('<a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> · подписи: итоги стран');
+    for(const[n,z]of[['base',210],['generation',310],['selection',340],['labels',370]])map.createPane(n).style.zIndex=z;
+    baseLayer=L.geoJSON(geo,{pane:'base',style:{color:'#354c63',weight:.7,fillColor:'#101e30',fillOpacity:1},onEachFeature:(f,l)=>l.on('click',e=>countryClick(f,e))}).addTo(map);
+    fillLayer=L.geoJSON(geo,{pane:'generation',style,onEachFeature:(f,l)=>l.on('click',e=>countryClick(f,e))}).addTo(map);
+    outlineLayer=L.geoJSON(null,{pane:'selection',style:{color:'#f1faff',weight:2,fill:false,interactive:false}}).addTo(map);labels=L.layerGroup().addTo(map);
+    map.fitBounds([[-50,-160],[73,170]],{padding:[20,40]});if(state.mapView&&[state.mapView.lat,state.mapView.lon,state.mapView.zoom].every(Number.isFinite))map.setView([state.mapView.lat,state.mapView.lon],Math.max(0,Math.min(7,state.mapView.zoom)),{animate:false});
+    map.on('moveend zoomend',()=>{const c=map.getCenter();state.mapView={lat:c.lat,lon:c.lng,zoom:map.getZoom()};renderLabels();save();});
     $('#zoom-in').onclick=()=>map.zoomIn();$('#zoom-out').onclick=()=>map.zoomOut();$('#world-button').onclick=()=>chooseCountry('WORLD',true);
-    $$('[data-layer]').forEach(b=>b.onclick=()=>{state.layers[b.dataset.layer]=!state.layers[b.dataset.layer];updateLayers();});
-    $('#nuclear-filter').value=state.nuclear;$('#dc-filter').value=state.dc;$('#streets-toggle').checked=state.streets;
-    $('#nuclear-filter').onchange=e=>{state.nuclear=e.target.value;updatePoints();save();};$('#dc-filter').onchange=e=>{state.dc=e.target.value;updatePoints();save();};
-    $('#streets-toggle').onchange=e=>{state.streets=e.target.checked;detailMap();save();};
+    $$('[data-layer]').forEach(b=>b.onclick=()=>{state.layers[b.dataset.layer]=!state.layers[b.dataset.layer];if(!activeMetrics().includes(state.focus))state.focus=activeMetrics()[0]||'gen';updateLayers();});
+    $('#map-metric').value=state.focus;$('#map-metric').onchange=e=>{state.focus=e.target.value;state.layers[Object.keys(layerKeys).find(k=>layerKeys[k]===state.focus)]=true;updateLayers();};
     $('#country-select').onchange=e=>chooseCountry(e.target.value,true);$$('[data-country]').forEach(b=>b.onclick=()=>chooseCountry(b.dataset.country,true));
-    $('#site-search').oninput=search;
-    $('#point-coverage').textContent=fmt(dcData.sites.length)+' объектов OSM и '+fmt(nuclearData.sites.length)+' точек GEM в снимке. Это открытые каталоги; полнота различается по странам.';
-    detailMap();
-    window.atlas={map,state,dcGroup,nuclearGroup,dcMarkers,nuclearMarkers,chooseCountry,zoomToSite,updateLayers,version:'2026.10.11'};
+    $('#country-ranking').onclick=()=>{state.rank=state.focus;$('#rank-search').value=state.country==='WORLD'?'':country[state.country].name;view('ranking');};$('#country-forecast').onclick=()=>{state.forecast=state.country;view('future');};updateLayers(false);chooseCountry(state.country,false);
   }
-  function methodology(){
-    $('#methodology').innerHTML=`<h3>Что означают точки</h3><ul><li><b>ЦОД:</b> ${fmt(dcData.sites.length)} объектов OpenStreetMap. Снимок OpenDataCenterMap от 06.10.2026; это узлы, здания и площадки. Несколько зданий одного кампуса могут быть отдельными точками. Координата — узел OSM либо центр контура; отсутствие точки не означает отсутствие ЦОД. <a href="https://opendatacentermap.deuxfleurs.page/" target="_blank" rel="noopener noreferrer">Каталог и происхождение</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors, ODbL</a>.</li><li><b>АЭС:</b> 208 точек, 196 проектов, 424 блока со статусом operating и 85 construction. <a href="https://globalenergymonitor.org/projects/global-nuclear-power-tracker" target="_blank" rel="noopener noreferrer">Global Nuclear Power Tracker, Global Energy Monitor, август 2026</a>. ${fmt(nuclearData.sites.filter(s=>s.accuracy==='approximate').length)} координат приблизительные; они выделены в карточках. Точки объединяют блоки только при совпадении project-id и исходных координат. Мощность — номинальная электрическая.</li><li>Статус GEM <i>operating</i> не подтверждает текущую генерацию; <i>construction</i> может включать подготовку площадки. У Запорожской АЭС сохранён статус каталога с отдельным пояснением. Закрытые и отменённые блоки не включены. Данные адаптированы из GEM по <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>.</li></ul><h3>Почему статистика отличается от числа точек</h3><ul><li><b>Выработка:</b> <a href="https://ember-energy.org/latest-insights/global-electricity-review-2026/supporting-materials/" target="_blank" rel="noopener noreferrer">Ember Global Electricity Review 2026</a>. Мир: 31 779,37 ТВт·ч за 2025. По странам — последний доступный год, указанный в карточке. Страны разных лет не складываются в мировой итог. Архивные данные до 2023 не окрашены.</li><li><b>ЦОД в карточке страны:</b> <a href="https://www.datacentermap.com/datacenters/" target="_blank" rel="noopener noreferrer">Data Center Map</a>, просмотр 11.10.2026. Заголовок каталога: 12 259, сумма строк стран: 12 257. Это отдельный перечень, не полный мировой реестр и не число точек OSM. Возможен особенно сильный недоучёт России и Китая.</li><li><b>Атомная статистика:</b> <a href="https://www.iaea.org/publications/16057/energy-electricity-and-nuclear-power-estimates-for-the-period-up-to-2060" target="_blank" rel="noopener noreferrer">МАГАТЭ RDS-1/46</a>, конец 2025: 413 блоков, 377,076 ГВт и 72 строящихся блока. Даты и определения отличаются от GEM. Атомная выработка в профиле взята из Ember для сопоставимости.</li><li><b>5G:</b> <a href="https://www.mobileconnectivityindex.com/" target="_blank" rel="noopener noreferrer">GSMA MCI 2026</a>, доля населения с покрытием за 2025. Мировые 55,1% — отдельная оценка <a href="https://www.itu.int/itu-d/reports/statistics/2025/10/15/ff25-mobile-network-coverage/" target="_blank" rel="noopener noreferrer">ITU</a>. Границы показывают показатель страны; это не контуры радиосигнала и не покрытие всей территории. Ноль не исключает пилотные зоны. <a href="https://english.www.gov.cn/archive/statistics/202601/28/content_WS6979f123c6d00ca5f9a08ce7.html" target="_blank" rel="noopener noreferrer">Базовые станции Китая: MIIT</a>.</li></ul><h3>Карта и офлайн-режим</h3><p>Обзорные границы: Natural Earth / d3-maps atlas. Крупный масштаб использует OpenStreetMap; тайлы запрашиваются только для просматриваемой области и не загружаются пакетом. При отсутствии сети доступны сохранённые данные, точки и обзорные контуры. Линии границ служат визуализации источника и не определяют политический статус территорий.</p><h3>Солнечное сравнение</h3><p>Светимость 3,828 × 10²⁶ Вт; поток у Земли 1361 Вт/м²; радиус Земли 6371 км. Перехватываемая мощность = 1361 × π × R². Средняя электрическая мощность = годовая выработка / 8760 часов. Время эквивалента = годовая энергия / мощность излучения.</p>`;
+  function updateLayers(persist=true){fillLayer?.setStyle(style);$$('[data-layer]').forEach(b=>b.setAttribute('aria-pressed',String(!!state.layers[b.dataset.layer])));$('#layer-count').textContent=activeMetrics().length;$('#map-metric').value=state.focus;legend();renderLabels();profile();if(persist)save();}
+  function legend(){const k=state.focus,s=M.specs[k],vals=k==='g5'?[0,25,50,75,100]:k==='gen'?[0,10,100,1000,10000]:k==='dc'?[0,10,100,1000]:[0,10,30,60,100];$('#legend').innerHTML=activeMetrics().length?`<span class="legend-title">Цвет · ${esc(s.name)}, ${esc(s.unit)}</span><div class="gradient" style="background:linear-gradient(to right,${vals.map(v=>metricColor(v,k)).join(',')})"></div><div class="legend-ticks">${vals.map(v=>`<span>${fmt(v)}</span>`).join('')}</div><p class="small muted">${k==='g5'?'Доля населения в зоне 5G. Заливка страны не показывает границы радиосигнала.':'Для масштаба значений используется логарифмическая шкала.'} Серый — нет данных.</p>`:'<p class="small muted">Включите слой, чтобы увидеть показатели.</p>';
+    $('#map-status').textContent=activeMetrics().length?`${s.name} · ${k==='g5'?'GSMA 2025':k==='gen'?'последний год страны':period(world,k)}`:'Все слои выключены';$('#point-coverage').textContent='Числа в подписях — итоги стран. При увеличении появляются подписи меньших стран.';}
+  function renderLabels(){if(!map||!country||$('#view-map').hidden)return;labels.clearLayers();const keys=activeMetrics();if(!keys.length)return;const bounds=map.getBounds(),size=map.getSize(),occupied=[];const list=Object.entries(country).filter(([id,c])=>c.ll&&bounds.contains([c.ll[1],c.ll[0]])&&(map.getZoom()>=2.5||c.gen>=100||id===state.country)).sort(([a,ca],[b,cb])=>(b===state.country?1:0)-(a===state.country?1:0)||(['RUS','CHN','USA'].includes(b)?1:0)-(['RUS','CHN','USA'].includes(a)?1:0)||(cb.gen||0)-(ca.gen||0));
+    for(const[id,c]of list){if(!keys.some(k=>c[k]!=null))continue;const point=map.latLngToContainerPoint([c.ll[1],c.ll[0]]),wide=keys.length>1?150:108,high=keys.length>2?88:keys.length===2?63:62,box={x:point.x-wide/2,y:point.y-high/2,w:wide+10,h:high+9};let placed=false;for(const dy of [0,-70,70]){box.x=Math.max(5,Math.min(size.x-wide-6,point.x-wide/2));box.y=Math.max(42,Math.min(size.y-high-48,point.y-high/2+dy));if(!occupied.some(b=>box.x<b.x+b.w&&box.x+box.w>b.x&&box.y<b.y+b.h&&box.y+box.h>b.y)){placed=true;break;}}if(!placed)continue;occupied.push({...box});
+      const cells=keys.map(k=>`<span class="map-number" style="--nc:${M.specs[k].color}"><small>${{gen:'ЭЭ',dc:'ЦОД·OSM',reactors:'АЭС',g5:'5G'}[k]}</small><b>${c[k]==null?'—':fmt(c[k],k==='gen'||k==='g5'?2:0)}${k==='g5'&&c[k]!=null?'%':''}</b></span>`).join('');
+      const html=`<div class="country-stat ${id===state.country?'selected':''} ${keys.length===1?'single':''}"><strong>${esc(c.name)}</strong><div class="country-numbers">${cells}</div>${keys.length===1&&keys[0]==='g5'&&c.g5!=null?`<i class="coverage-bar"><i style="width:${c.g5}%"></i></i>`:''}</div>`;
+      L.marker(map.containerPointToLatLng([box.x+wide/2,box.y+high/2]),{pane:'labels',keyboard:true,title:c.name+' — показатели страны',icon:L.divIcon({className:'country-stat-marker',html,iconSize:[wide,high],iconAnchor:[wide/2,high/2]})}).on('click',e=>countryClick({properties:{iso:id}},e)).addTo(labels);}
   }
+  function profile(){if(!world)return;const c=state.country==='WORLD'?world:country[state.country];if(!c)return;$('#country-select').value=state.country;$('#profile-name').textContent=state.country==='WORLD'?'Весь мир':c.name;$('#profile-year').textContent='Проверено '+date(dataset.meta.checkedAt);
+    $('#metrics').innerHTML=['gen','dc','reactors','g5'].map(k=>{const s=M.specs[k];return`<div class="metric" style="--mc:${s.color}"><span>${esc(s.name)} · ${esc(s.unit)}</span><strong>${fmt(c[k],s.digits)}${k==='g5'&&c[k]!=null?'%':''}</strong><small>${esc(period(c,k))}</small></div>`;}).join('');
+    const notes=[`Строятся атомные блоки: ${fmt(c.build)}.`,`ЦОД: действующие по меткам открытого каталога; это неполный перечень объектов, не оценка всех ЦОД страны.`];if(c.dcBuild!=null)notes.push('Строящиеся объекты ЦОД в том же каталоге: '+fmt(c.dcBuild)+'.');if(c.nuclear!=null&&c.gen>0)notes.push('Атомная выработка: '+fmt(c.nuclear,2)+' ТВт·ч ('+fmt(100*c.nuclear/c.gen,2)+'%).');if(state.country==='RUS')notes.push('5G: 0% — показатель GSMA за 2025 год; пилотные зоны могут существовать.');$('#profile-note').textContent=notes.join(' ');
+  }
+  function chooseCountry(id,zoom=true){if(id!=='WORLD'&&!country[id])return;state.country=id;outlineLayer.clearLayers();if(id==='WORLD'){if(zoom)map.fitBounds([[-50,-160],[73,170]],{padding:[18,40],animate:false});}else{const fs=geo.features.filter(f=>f.properties.iso===id);if(fs.length){outlineLayer.addData(fs);if(zoom){const c=country[id];map.setView([c.ll[1],c.ll[0]],['RUS','CHN','USA','CAN','BRA','AUS'].includes(id)?2.75:4.2,{animate:false});}}else if(zoom){const c=country[id];map.setView([c.ll[1],c.ll[0]],4.5,{animate:false});}}profile();renderLabels();save();}
+  function countryClick(f,e){const id=f.properties.iso,c=country[id];if(!c)return;chooseCountry(id,false);const rows=['gen','dc','reactors','g5'].map(k=>`<p><span style="color:${M.specs[k].color}">${esc(M.specs[k].name)}</span><br><b>${fmt(c[k],M.specs[k].digits)} ${esc(M.specs[k].unit)}</b><small> · ${esc(period(c,k))}</small></p>`).join('');L.popup({maxWidth:270}).setLatLng(e.latlng||[c.ll[1],c.ll[0]]).setContent(`<h3>${esc(c.name)}</h3>${rows}<small>ЦОД — объекты открытого каталога. Полные определения: «Источники».</small>`).openOn(map);}
+  function ranks(){const metric=state.rank;$('#rank-metric').value=metric;$('#rank-year').value=state.rankYear;$('#rank-year-label').hidden=metric!=='gen';const all=M.ranking(country,metric,state.rankYear),q=$('#rank-search').value.trim().toLocaleLowerCase('ru'),rows=all.filter(c=>[c.name,c.en,c.id].some(v=>v?.toLocaleLowerCase('ru').includes(q))),s=M.specs[metric];$('#rank-value-title').textContent=s.unit;
+    $('#rank-note').textContent=metric==='index'?'Индекс из четырёх показателей с равными весами. Неофициальный расчёт; выработка и 5G — только 2025.':metric==='dc'?'Рейтинг полноты и масштаба открытого каталога OSM. Он не является рейтингом общего числа дата-центров в странах.':metric==='gen'?(state.rankYear==='2025'?'Сопоставимый рейтинг выработки за полный 2025 год.':'Последнее доступное значение каждой страны. Годы могут различаться — это видно в таблице.'):`${s.name} · ${period(world,metric)}. Одинаковым значениям присваивается одно место.`;
+    $('#rank-pins').innerHTML=['RUS','CHN','USA'].map(id=>{const c=all.find(r=>r.id===id);return`<button data-rank-country="${id}"><span>${esc(country[id].name)}</span><strong>${c?'№ '+c.rank:'Нет места'}</strong><small>${c?fmt(c.value,s.digits)+' '+s.unit:'Недостаточно данных'}</small></button>`;}).join('');$$('[data-rank-country]').forEach(b=>b.onclick=()=>{$('#rank-search').value=country[b.dataset.rankCountry].name;ranks();});
+    $('#rank-body').innerHTML=rows.map(c=>`<tr class="${['RUS','CHN','USA'].includes(c.id)?'pinned-row':''}"><td>${c.rank}</td><th scope="row"><button data-country-row="${c.id}">${esc(c.name)}</button></th><td class="rank-number"><b>${fmt(c.value,s.digits)}</b><i style="width:${Math.max(0,100*c.value/(all[0]?.value||1))}%;--bar:${s.color}"></i></td><td>${metric==='index'?'2025 + текущие':esc(period(c,metric))}</td></tr>`).join('')||'<tr><td colspan="4">Нет совпадений или сопоставимых данных. Попробуйте другой поиск.</td></tr>';$('#rank-count').textContent=`Показано ${rows.length} из ${all.length} стран и территорий. Пропуски не заменяются нулями.`;$$('[data-country-row]').forEach(b=>b.onclick=()=>{chooseCountry(b.dataset.countryRow,true);view('map');});}
+  $('#rank-metric').onchange=e=>{state.rank=e.target.value;ranks();save();};$('#rank-year').onchange=e=>{state.rankYear=e.target.value;ranks();save();};$('#rank-search').oninput=ranks;
+  function forecasts(){const id=state.forecast||'WORLD',c=id==='WORLD'?world:country[id];$('#forecast-country').value=id;$('#country-outlook').innerHTML=`<article class="reading-card"><span class="eyebrow">${id==='WORLD'?'МИР':esc(c.name.toUpperCase())} · НАБЛЮДАЕМЫЙ ЗАДЕЛ</span><div class="outlook-numbers"><div><strong>${fmt(c.reactors)}</strong><span>действующих блоков</span></div><div><strong>+${fmt(c.build)}</strong><span>блоков строятся</span></div><div><strong>${c.dcBuild==null?'—':fmt(c.dcBuild)}</strong><span>ЦОД строятся в каталоге</span></div></div><p>Строительство — факт статуса проекта, а не обещание ввода к определённому году. Будущее число действующих блоков зависит также от закрытий. Объекты ЦОД в OSM не дают полного прогноза страны.</p></article>`;
+    const items=dataset.forecasts.filter(f=>!f.countries||f.countries.includes(id)||id==='WORLD');$('#forecast-cards').innerHTML=items.map(f=>`<article class="reading-card"><span class="eyebrow">${esc(f.scope)} · ${esc(f.kind)}</span><h2>${esc(f.title)}</h2><div class="forecast-value" style="color:${M.specs[f.metric]?.color||'var(--cyan)'}">${esc(f.value)}</div><p>${esc(f.text)}</p><small class="muted">${esc(f.period||'')} · публикация ${esc(f.publishedAt||'дата указана в источнике')}</small><a class="forecast-source" href="${esc(safeURL(f.url))}" target="_blank" rel="noopener noreferrer">${esc(f.source)} ↗</a></article>`).join('');if(id!=='WORLD'&&!items.length)$('#forecast-cards').innerHTML='<p class="muted">Сопоставимый официальный численный прогноз для этой страны в подключённых источниках не опубликован. Доступные мировые прогнозы — в выборе «Весь мир».</p>';}
+  $('#forecast-country').onchange=e=>{state.forecast=e.target.value;forecasts();save();};
+  function methodology(){const sourceCards=Object.entries(dataset.sources).map(([id,s])=>`<h3>${esc(s.name)}</h3><p>${esc(s.definition)}</p><p>${esc(s.note||'')}</p><p class="small">Период: ${esc(s.period||s.asOf||'дата каталога')}. Получено: ${date(s.retrievedAt)}. <a href="${esc(safeURL(s.url))}" target="_blank" rel="noopener noreferrer">Источник ↗</a></p>`).join('');$('#methodology').innerHTML=`<h3>Почему цифры раньше отличались</h3><p>Первый вариант использовал агрегаты коммерческого каталога Data Center Map, следующий — точки OSM и группы площадок GEM. Это разные объекты счёта. Теперь в карте, карточке и рейтинге используется одна таблица: открытый каталог ЦОД OSM; официальные энергоблоки МАГАТЭ PRIS; годовая выработка Ember; охват населения 5G GSMA.</p><p><b>Точные значения источника не означают полный учёт реального мира.</b> Для ЦОД такого общедоступного полного реестра нет. По странам с неизвестным числом объектов показано «Нет данных». АЭС считаются блоками, а не станциями или маркерами.</p>${sourceCards}<h3>Общий индекс</h3><p>Четыре равновесные составляющие; логарифмическая нормализация выработки, числа ЦОД и блоков. 5G — процент. Индекс считается только при наличии всех четырёх значений; выработка и 5G — за 2025 год. Методика и ограничения открываются в разделе «Рейтинг».</p><h3>Солнце и энергия</h3><p>Светимость 3,828 × 10²⁶ Вт; поток у Земли 1361 Вт/м²; радиус 6371 км. Перехватываемая мощность = 1361 × π × R². Средняя электрическая мощность = годовая выработка / число часов года. Это сравнение энергий до потерь и преобразования.</p><h3>Границы на карте</h3><p>Natural Earth, обзорная геометрия. Подписи относятся ко всей стране; их координаты не являются местоположением ЦОД или АЭС. Карта не определяет политический статус территорий.</p>`;$('#snapshot-label').textContent='ПРОВЕРКА ИСТОЧНИКОВ · '+date(dataset.meta.checkedAt);}
+  function updates(){const m=dataset.monitoring||{};$('#monitor-status').textContent=m.description||'Расписание ещё не подтверждено.';$('#data-status').textContent=`Снимок ${date(dataset.meta.checkedAt)}. Версия данных: ${dataset.meta.revision}. ${navigator.onLine?'При открытии атлас проверяет обновления автоматически.':'Нет сети — показана сохранённая копия.'} ${Object.keys(dataset.meta.lastAttemptErrors||{}).length?'Не обновились: '+Object.keys(dataset.meta.lastAttemptErrors).join(', ')+'. Показаны предыдущие значения этих источников.':''}`;const fm=dataset.meta.forecastMonitoring;$('#forecast-watch-status').textContent=fm?`Прогнозы: автоматически прочитано ${fm.checkedSources} источников; ${Object.keys(fm.failedSources||{}).length} требуют отдельной проверки. Изменения числовых фрагментов отмечаются для сверки, проверенные прогнозы сохраняются.`:'Прогнозы проверены по указанным первоисточникам; автоматическая проверка ещё не запускалась.';$('#change-log').innerHTML=(dataset.changes||[]).slice().reverse().map(c=>`<article class="change-item"><small>${date(c.date)}</small><h3>${esc(c.title)}</h3><p>${esc(c.text)}</p>${c.url?`<a href="${esc(safeURL(c.url))}" target="_blank" rel="noopener noreferrer">Источник ↗</a>`:''}</article>`).join('')||'<p class="muted">После следующих проверок здесь появятся изменения показателей.</p>';}
+  async function fetchSnapshot(){const r=await fetch('data/countries.json',{cache:'no-cache'});if(!r.ok)throw Error('HTTP '+r.status);const p=await r.json();M.validate(p);return p;}
+  function applySnapshot(p){dataset=p;country=p.countries;world=p.world;if(state.country!=='WORLD'&&!country[state.country])state.country='WORLD';}
+  async function refreshData(manual=false){if(refreshing||!navigator.onLine)return;if(!manual&&Date.now()-lastFetch<300000)return;refreshing=true;$('#refresh-data').disabled=true;try{const p=await fetchSnapshot();lastFetch=Date.now();if(p.meta.revision!==dataset.meta.revision){applySnapshot(p);updateLayers();methodology();updates();ranks();forecasts();if(state.view==='sun')drawSun();toast('Показатели обновлены. Подробности — в журнале изменений.');}else{updates();if(manual)toast('Установлен последний опубликованный снимок данных.');}}catch(e){if(manual)toast('Новые данные недоступны. Сохранённый снимок остаётся на экране.');}finally{refreshing=false;$('#refresh-data').disabled=false;}}
+  $('#refresh-data').onclick=()=>refreshData(true);window.addEventListener('online',()=>{updates();refreshData();});window.addEventListener('offline',()=>dataset&&updates());document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&initialized)refreshData();});setInterval(()=>{if(document.visibilityState==='visible'&&initialized)refreshData();},900000);
+  function fillSelects(){const ids=Object.keys(country).filter(k=>k!=='ATA').sort((a,b)=>country[a].name.localeCompare(country[b].name,'ru'));for(const sel of [$('#country-select'),$('#forecast-country')]){sel.innerHTML='<option value="WORLD">Весь мир</option>';for(const id of ['RUS','CHN','USA',...ids.filter(k=>!['RUS','CHN','USA'].includes(k))]){const o=document.createElement('option');o.value=id;o.textContent=country[id].name;sel.append(o);}}}
+  async function load(){try{const[p,t]=await Promise.all([fetchSnapshot(),fetch('data/world.json').then(r=>r.json())]);applySnapshot(p);lastFetch=Date.now();const aliases={SDS:'SSD',KOS:'XKX',SAH:'ESH',PSX:'PSE'};geo=topojson.feature(t,t.objects.features);geo.features=geo.features.filter(f=>f.properties.id!=='ATA');geo.features.forEach(f=>f.properties.iso=aliases[f.properties.id]||f.properties.id);fillSelects();setupMap();methodology();space();updates();initialized=true;view(state.view,false);$('#map').setAttribute('aria-busy','false');window.atlas={map,state,get dataset(){return dataset;},chooseCountry,updateLayers,refreshData,view,ranks,activeMetrics};fetch('version.json',{cache:'no-cache'}).then(r=>r.json()).then(v=>$('#release-label').textContent='Версия приложения '+v.version+' · '+v.date).catch(()=>{});}catch(e){$('#map-status').textContent='Карта не загрузилась';$('#map-hint').textContent='Проверьте соединение и обновите страницу';$('#point-coverage').textContent=e.message;console.error(e);}}
+  let rw=0;new ResizeObserver(()=>{if(rw!==innerWidth){rw=innerWidth;if(innerWidth>760&&document.body.classList.contains('layers-open'))panel(false);if(initialized){if(state.view==='sun')drawSun();if(state.view==='future')drawNuclear();map.invalidateSize({pan:false});renderLabels();}}}).observe(document.documentElement);
+  if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{navigator.serviceWorker.ready.then(()=>$('#offline-status').textContent='Офлайн-копия готова. Новые данные загружаются при подключении.');reg.update();if(reg.waiting)reg.waiting.postMessage({type:'ACTIVATE_UPDATE'});reg.addEventListener('updatefound',()=>reg.installing?.addEventListener('statechange',e=>{if(e.target.state==='installed'&&navigator.serviceWorker.controller)reg.waiting?.postMessage({type:'ACTIVATE_UPDATE'});}));}).catch(()=>$('#offline-status').textContent='Не удалось сохранить офлайн-копию.');
+  if(new URLSearchParams(location.search).get('view')==='updates')state.view='updates';
+  navigator.serviceWorker?.addEventListener('message',e=>{if(e.data?.type==='OPEN_UPDATES'){view('updates');refreshData();}});
+  load();
   function space(){
     const events=[
       ['2023','Эксперимент','Солнечная энергия из космоса','Caltech MAPLE: продемонстрирована беспроводная передача энергии в космосе. Промышленная генерация ещё не доказана.','Caltech','https://www.caltech.edu/about/news/in-a-first-caltechs-space-solar-power-demonstrator-wirelessly-transmits-power-in-space'],
@@ -217,37 +87,15 @@
     ];
     $('#space-timeline').innerHTML=events.map(([y,s,n,t,a,u])=>`<article class="timeline-item"><span class="timeline-year">${y}</span><div class="timeline-content"><span class="status-badge ${s==='План'?'plan':''}">${s}</span><h2>${n}</h2><p>${t}</p><a href="${u}" target="_blank" rel="noopener noreferrer">${a} ↗</a></div></article>`).join('');
   }
-  async function load(){
-    try{
-      const urls=['data/countries.json','data/world.json','data/datacenters.json','data/nuclear.json'];
-      const [p,t,d,n]=await Promise.all(urls.map(async u=>{const r=await fetch(u);if(!r.ok)throw Error('Не загружен '+u);return r.json();}));
-      country=p.countries;world=p.world;dcData=d;nuclearData=n;const aliases={SDS:'SSD',KOS:'XKX',SAH:'ESH',PSX:'PSE'};
-      geo=topojson.feature(t,t.objects.features);geo.features=geo.features.filter(f=>f.properties.id!=='ATA');geo.features.forEach(f=>f.properties.iso=aliases[f.properties.id]||f.properties.id);
-      if(state.country!=='WORLD'&&!country[state.country])state.country='WORLD';
-      const ids=Object.keys(country).filter(k=>k!=='ATA').sort((a,b)=>country[a].name.localeCompare(country[b].name,'ru'));
-      for(const id of ['RUS','CHN','USA',...ids.filter(k=>!['RUS','CHN','USA'].includes(k))]){const o=document.createElement('option');o.value=id;o.textContent=country[id].name;$('#country-select').append(o);}
-      setupMap();methodology();space();initialized=true;view(state.view,false);$('#map').setAttribute('aria-busy','false');
-      fetch('version.json').then(r=>r.json()).then(v=>$('#release-label').textContent='Версия '+v.version+' · '+v.date).catch(()=>{});
-    }catch(e){$('#map-status').textContent='Карта не загрузилась';$('#map-hint').textContent='Проверьте соединение и обновите страницу';$('#point-coverage').textContent=e.message;console.error(e);}
-  }
-  window.addEventListener('online',()=>{if(map)detailMap();});window.addEventListener('offline',()=>{if(map)detailMap();});
-  let rw=0;new ResizeObserver(()=>{if(rw!==innerWidth){rw=innerWidth;if(innerWidth>760&&document.body.classList.contains('layers-open'))panel(false);if(initialized){if(state.view==='sun')drawSun();if(state.view==='future')drawNuclear();map.invalidateSize({pan:false});}}}).observe(document.documentElement);
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('./sw.js').then(reg=>{
-      navigator.serviceWorker.ready.then(()=>$('#offline-status').textContent='Офлайн-копия готова: интерфейс, данные и обзорная карта.');
-      if(reg.waiting)toast('Доступна новая версия. Она откроется после закрытия всех окон приложения.');
-    }).catch(()=>$('#offline-status').textContent='Не удалось сохранить офлайн-копию. Приложение работает с интернетом.');
-  }else $('#offline-status').textContent='Офлайн-режим недоступен в этом браузере.';
-  load();
   function drawSun() {
     const node=root.querySelector('#sun-chart'), width=node.clientWidth;
     if(!width)return;
     const height=310,left=width<500?136:178,right=12,top=26,bottom=54;
     const rows=[
       ['ЦОД · потребление',world.dcEnergy/8760,'0,055 ТВт',color(2)],
-      ['Россия',country.RUS.gen/8760,'0,136 ТВт',color(1)],
-      ['Китай',country.CHN.gen/8760,'1,21 ТВт',color(1)],
-      ['Мир · генерация',world.meanTW,'3,63 ТВт',color(1)],
+      ['Россия',country.RUS.gen/8760,fmt(country.RUS.gen/8760,3)+' ТВт',color(1)],
+      ['Китай',country.CHN.gen/8760,fmt(country.CHN.gen/8760,3)+' ТВт',color(1)],
+      ['Мир · генерация',world.meanTW,fmt(world.meanTW,3)+' ТВт',color(1)],
       ['Солнце → Земля',world.sunIncidentTW,'≈174 тыс. ТВт',color(2)],
       ['Солнце → космос',3.828e14,'3,828 × 10¹⁴ ТВт',color(2)]
     ];
